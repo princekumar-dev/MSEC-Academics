@@ -590,6 +590,23 @@ function ActionDialog({ open, type, marksheet, anchorRect, onClose, onSubmit, lo
       }
     }
 
+    // If this is a type that should be centered (approve/reject/reschedule),
+    // prefer a centered/top absolute modal even on mobile (avoid bottom sheet)
+    const centerTypes = ['rejected', 'rescheduled', 'approved']
+    if (centerTypes.includes(type)) {
+      const PADDING = 16
+      const MODAL_WIDTH = Math.min(420, window.innerWidth - PADDING * 2)
+      const viewportWidth = window.innerWidth
+      const left = Math.max(PADDING, Math.min((viewportWidth - MODAL_WIDTH) / 2, viewportWidth - MODAL_WIDTH - PADDING))
+      const top = Math.max(window.scrollY + PADDING, window.scrollY + 80)
+      return {
+        width: MODAL_WIDTH,
+        position: 'absolute',
+        left,
+        top
+      }
+    }
+
     if (isMobile || !anchorRect) {
       return {
         width: '100%',
@@ -659,7 +676,11 @@ function ActionDialog({ open, type, marksheet, anchorRect, onClose, onSubmit, lo
   const innerBase = 'glass-card w-full p-6 shadow-2xl transition-all duration-100'
   const mobileTransform = open ? 'translate-y-0 rounded-t-2xl' : 'translate-y-full rounded-t-2xl'
   const desktopTransform = open ? 'translate-y-0 scale-100' : 'translate-y-2 scale-95'
-  const innerClasses = `${innerBase} ${isMobile ? mobileTransform : desktopTransform}`
+  // If this dialog is one of the center types, use desktop transform even on mobile
+  const useDesktopStyle = ['rejected', 'rescheduled', 'approved'].includes(type)
+  // Add subtle shadow and softer rounding for centered dialogs on mobile
+  const mobileCenteredExtra = isMobile && useDesktopStyle ? 'rounded-xl shadow-lg' : ''
+  const innerClasses = `${innerBase} ${mobileCenteredExtra} ${useDesktopStyle ? desktopTransform : (isMobile ? mobileTransform : desktopTransform)}`
 
   return (
     <div
@@ -742,9 +763,11 @@ function BulkRescheduleDialog({ open, onClose, onSubmit, loading }) {
   const innerBase = 'glass-card w-full max-w-md p-6 shadow-2xl transition-all duration-100'
   const mobileTransform = open ? 'translate-y-0 rounded-t-2xl' : 'translate-y-full rounded-t-2xl'
   const desktopTransform = open ? 'translate-y-0 scale-100' : 'translate-y-2 scale-95'
-  const innerClasses = `${innerBase} ${isMobile ? mobileTransform : desktopTransform}`
+  // Add subtle shadow and softer rounding when centered on mobile
+  const bulkMobileExtra = isMobile ? 'rounded-xl shadow-lg' : ''
+  const innerClasses = `${innerBase} ${bulkMobileExtra} ${desktopTransform}`
 
-  const dialogStyle = isMobile ? { position: 'fixed', left: 0, right: 0, bottom: 0 } : { position: 'absolute', top: window.scrollY + 120 }
+  const dialogStyle = { position: 'absolute', top: window.scrollY + 120 }
 
   const handleCloseBulk = (immediate = false) => {
     if (immediate) setRendered(false)
