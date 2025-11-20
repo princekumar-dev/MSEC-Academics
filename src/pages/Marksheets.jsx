@@ -167,8 +167,8 @@ function Marksheets() {
     ]
 
     const sampleRows = [
-      ['Umaiyasw', '21CSE001', 'II', 'A', '8388520784', 85, 88, 82, 79, 91, 87, 84, 89],
-      ['Rohith S', '21CSE002', 'II', 'A', '8754401180', 78, 85, 81, 76, 88, 83, 79, 86],
+      ['Umaiyaswaran', '21CSE001', 'II', 'B', '8388520784', 85, 88, 82, 79, 91, 87, 84, 89],
+      ['Rohith S', '21CSE002', 'II', 'B', '8754401180', 78, 85, 81, 76, 88, 83, 79, 86],
       ['Prince R', '21CSE003', 'II', 'B', '8778439728', 92, 94, 89, 87, 95, 91, 88, 93]
     ]
 
@@ -179,7 +179,8 @@ function Marksheets() {
 
     const workbook = XLSX.utils.book_new()
     const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows, guidanceRow])
-    worksheet['!merges'] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: headers.length - 1 } }]
+    const guidanceRowIndex = sampleRows.length + 1 // header row + sample rows
+    worksheet['!merges'] = [{ s: { r: guidanceRowIndex, c: 0 }, e: { r: guidanceRowIndex, c: headers.length - 1 } }]
     worksheet['!cols'] = headers.map(() => ({ wch: 18 }))
 
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
