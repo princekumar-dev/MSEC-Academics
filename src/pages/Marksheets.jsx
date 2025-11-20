@@ -88,14 +88,32 @@ function Marksheets() {
     setGroupedMarksheets(grouped)
   }, [marksheets])
 
-  // Helper function to refresh userData from localStorage
-  const refreshUserData = () => {
+  // Helper function to refresh userData from localStorage (and server if needed)
+  const refreshUserData = async () => {
     try {
       const auth = localStorage.getItem('auth')
       if (auth) {
-        const parsedAuth = JSON.parse(auth)
-        setUserData(parsedAuth)
-        return parsedAuth
+        let parsedAuth = JSON.parse(auth)
+        let updatedAuth = parsedAuth
+
+        if (!parsedAuth?.eSignature) {
+          const userId = parsedAuth?._id || parsedAuth?.id || localStorage.getItem('userId')
+          if (userId) {
+            try {
+              const profileRes = await fetch(`/api/users?action=profile&userId=${userId}`)
+              const profileData = await profileRes.json()
+              if (profileRes.ok && profileData.success && profileData.user) {
+                updatedAuth = { ...parsedAuth, ...profileData.user }
+                localStorage.setItem('auth', JSON.stringify(updatedAuth))
+              }
+            } catch (profileErr) {
+              console.error('Error fetching user profile:', profileErr)
+            }
+          }
+        }
+
+        setUserData(updatedAuth)
+        return updatedAuth
       }
     } catch (e) {
       console.error('Error refreshing user data:', e)
@@ -172,18 +190,23 @@ function Marksheets() {
       ['Prince R', '21CSE003', 'II', 'B', '8778439728', 92, 94, 89, 87, 95, 91, 88, 93]
     ]
 
-    const guidanceRow = [
-      '← Replace with student details (marks must be 0-100, use AB for absentees)',
-      ...Array(headers.length - 1).fill('')
-    ]
-
     const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows, guidanceRow])
-    const guidanceRowIndex = sampleRows.length + 1 // header row + sample rows
-    worksheet['!merges'] = [{ s: { r: guidanceRowIndex, c: 0 }, e: { r: guidanceRowIndex, c: headers.length - 1 } }]
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows])
     worksheet['!cols'] = headers.map(() => ({ wch: 18 }))
 
+    const instructionsSheet = XLSX.utils.aoa_to_sheet([
+      ['How to use this template'],
+      ['1. Delete the sample rows after reviewing the format.'],
+      ['2. Add one row per student and keep the header row untouched.'],
+      ['3. Use numeric marks between 0-100. Use AB/Absent for absentees.'],
+      ['4. Keep the first five columns (student info) filled for every row.'],
+      ['5. Rename, add, or remove subject columns as needed for your exam.'],
+      ['6. Save as XLSX before uploading to avoid formatting issues.']
+    ])
+    instructionsSheet['!cols'] = [{ wch: 90 }]
+
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
+    XLSX.utils.book_append_sheet(workbook, instructionsSheet, 'Instructions')
     XLSX.writeFile(workbook, 'marks-import-template.xlsx')
   }
 
@@ -311,7 +334,7 @@ function Marksheets() {
       }
       
       // Refresh user data from localStorage before checking signature
-      const currentUserData = refreshUserData()
+      const currentUserData = await refreshUserData()
       
       // Check if user has uploaded signature
       if (!currentUserData?.eSignature) {
@@ -354,7 +377,7 @@ function Marksheets() {
       }
       
       // Refresh user data from localStorage before checking signature
-      const currentUserData = refreshUserData()
+      const currentUserData = await refreshUserData()
       
       // Check if user has uploaded signature
       if (!currentUserData?.eSignature) {

@@ -22,11 +22,13 @@ function ApprovalRequests() {
   const [pendingRequests, setPendingRequests] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedStatus, setSelectedStatus] = useState('all')
-  const [actionModal, setActionModal] = useState({ open: false, type: null, marksheet: null })
+  const [actionModal, setActionModal] = useState({ open: false, type: null, marksheet: null, anchorRect: null })
   const [actionLoading, setActionLoading] = useState(false)
   const [actionError, setActionError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [bulkActionLoading, setBulkActionLoading] = useState(false)
+  const [bulkRescheduleOpen, setBulkRescheduleOpen] = useState(false)
+  const [bulkRescheduleLoading, setBulkRescheduleLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const navigate = useNavigate()
 
@@ -68,13 +70,23 @@ function ApprovalRequests() {
     }
   }
 
-  const handleAction = (marksheet, type) => {
+  const handleAction = (event, marksheet, type) => {
+    const hasWindow = typeof window !== 'undefined'
+    const rect = event?.currentTarget?.getBoundingClientRect()
+    const anchorRect = rect && hasWindow
+      ? {
+          top: rect.top + window.scrollY,
+          left: rect.left + window.scrollX,
+          width: rect.width,
+          height: rect.height
+        }
+      : null
     setActionError('')
-    setActionModal({ open: true, type, marksheet })
+    setActionModal({ open: true, type, marksheet, anchorRect })
   }
 
   const closeModal = () => {
-    setActionModal({ open: false, type: null, marksheet: null })
+    setActionModal({ open: false, type: null, marksheet: null, anchorRect: null })
     setActionError('')
   }
 
@@ -314,8 +326,8 @@ function ApprovalRequests() {
                         <span>{bulkActionLoading ? 'Processing...' : 'Approve All'}</span>
                       </span>
                     </button>
-                    <button
-                      onClick={() => handleBulkAction('rescheduled')}
+                                    <button
+                                      onClick={() => setBulkRescheduleOpen(true)}
                       disabled={bulkActionLoading || filteredRequests.filter(m => m.status === 'dispatch_requested' || m.status === 'rescheduled_by_hod').length === 0}
                       className={`px-3 sm:px-4 py-2 rounded-lg font-medium text-white text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-1 ${
                         bulkActionLoading || filteredRequests.filter(m => m.status === 'dispatch_requested' || m.status === 'rescheduled_by_hod').length === 0
@@ -394,21 +406,21 @@ function ApprovalRequests() {
                       <div className="p-4 sm:p-6 pt-3 sm:pt-4 bg-gray-50">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                           <button
-                            onClick={() => handleAction(marksheet, 'approved')}
+                            onClick={(e) => handleAction(e, marksheet, 'approved')}
                             className="px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
                           >
                             <span className="hidden sm:inline">Approve Dispatch</span>
                             <span className="sm:hidden">Approve</span>
                           </button>
                           <button
-                            onClick={() => handleAction(marksheet, 'rejected')}
+                            onClick={(e) => handleAction(e, marksheet, 'rejected')}
                             className="px-3 sm:px-4 py-2 sm:py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
                           >
                             <span className="hidden sm:inline">Reject Request</span>
                             <span className="sm:hidden">Reject</span>
                           </button>
                           <button
-                            onClick={() => handleAction(marksheet, 'rescheduled')}
+                            onClick={(e) => handleAction(e, marksheet, 'rescheduled')}
                             className="px-3 sm:px-4 py-2 sm:py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
                           >
                             Reschedule
@@ -438,10 +450,63 @@ function ApprovalRequests() {
         open={actionModal.open}
         type={actionModal.type}
         marksheet={actionModal.marksheet}
+        anchorRect={actionModal.anchorRect}
         onClose={closeModal}
         onSubmit={submitAction}
         loading={actionLoading}
         error={actionError}
+      />
+      <BulkRescheduleDialog
+        open={bulkRescheduleOpen}
+        onClose={() => setBulkRescheduleOpen(false)}
+        loading={bulkRescheduleLoading}
+        onSubmit={async ({ comments, scheduledDispatchDate }) => {
+          // perform bulk reschedule
+          const targetRequests = filteredRequests.filter(m => m.status === 'dispatch_requested' || m.status === 'rescheduled_by_hod')
+          if (targetRequests.length === 0) {
+            setFeedback('No pending requests to reschedule.')
+            setBulkRescheduleOpen(false)
+            return
+          }
+          try {
+            setBulkRescheduleLoading(true)
+            const hodId = userData._id || userData.id
+            const promises = targetRequests.map(marksheet => 
+              fetch('/api/marksheets?action=hod-response', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  marksheetId: marksheet._id,
+                  hodId,
+                  response: 'rescheduled',
+                  comments: comments || '',
+                  scheduledDispatchDate: scheduledDispatchDate || null
+                })
+              }).then(res => res.json()).catch(err => ({ success: false, error: err.message }))
+            )
+
+            const results = await Promise.all(promises)
+            const successCount = results.filter(r => r && r.success).length
+            const failCount = results.length - successCount
+
+            if (successCount > 0) {
+              const msg = `Rescheduled ${successCount} request${successCount > 1 ? 's' : ''}.${failCount > 0 ? ` ${failCount} failed.` : ''}`
+              setFeedback(msg)
+              showSuccess('Bulk Reschedule', `${successCount}/${results.length} requests rescheduled`)
+            } else {
+              const errMsg = `Failed to reschedule any requests. Please try again.`
+              setActionError(errMsg)
+              showError('Bulk Reschedule Failed', errMsg)
+            }
+
+            await fetchPendingRequests()
+          } catch (err) {
+            setActionError(err.message || 'Bulk reschedule failed')
+          } finally {
+            setBulkRescheduleLoading(false)
+            setBulkRescheduleOpen(false)
+          }
+        }}
       />
       
       {/* Confetti celebration */}
@@ -459,9 +524,25 @@ function InfoRow({ label, value }) {
   )
 }
 
-function ActionDialog({ open, type, marksheet, onClose, onSubmit, loading, error }) {
+function ActionDialog({ open, type, marksheet, anchorRect, onClose, onSubmit, loading, error }) {
   const [comments, setComments] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : true))
+  const [rendered, setRendered] = useState(open)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (open) setRendered(true)
+    else {
+      const t = setTimeout(() => setRendered(false), 120)
+      return () => clearTimeout(t)
+    }
+  }, [open])
 
   useEffect(() => {
     if (!open || !marksheet) return
@@ -478,72 +559,136 @@ function ActionDialog({ open, type, marksheet, onClose, onSubmit, loading, error
     }
   }, [open, type, marksheet])
 
-  if (!open || !marksheet) return null
+  if (!rendered || !marksheet) return null
 
   const isReschedule = type === 'rescheduled'
   const title = type === 'approved' ? 'Approve dispatch request' : type === 'rejected' ? 'Reject dispatch request' : 'Reschedule dispatch request'
 
   const submit = (e) => {
     e.preventDefault()
-    const payload = {
-      comments: comments.trim() || undefined,
-      scheduledDispatchDate: undefined
-    }
+    const payload = { comments: comments.trim() || undefined, scheduledDispatchDate: undefined }
     if (scheduledDate) {
       const iso = new Date(scheduledDate)
-      if (!Number.isNaN(iso.getTime())) {
-        payload.scheduledDispatchDate = iso.toISOString()
-      }
+      if (!Number.isNaN(iso.getTime())) payload.scheduledDispatchDate = iso.toISOString()
     }
+    // Optimistically close the dialog immediately to avoid UI lag
+    try { handleClose(true) } catch (err) { /* ignore */ }
     onSubmit(payload)
   }
 
+  const getPositionStyle = () => {
+    if (typeof window === 'undefined') {
+      return {
+        width: '100%',
+        maxWidth: '100%',
+        borderRadius: '24px 24px 0 0',
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        margin: '0 auto'
+      }
+    }
+
+    if (isMobile || !anchorRect) {
+      return {
+        width: '100%',
+        maxWidth: '100%',
+        borderRadius: '24px 24px 0 0',
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        margin: '0 auto'
+      }
+    }
+
+    // For reject and reschedule, prefer centered modal position (consistent with approve modal look)
+    const PADDING = 16
+    const MODAL_WIDTH = 420
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+
+    // If this dialog is a reject or reschedule action, center it horizontally and place slightly below top of viewport
+    if (type === 'rejected' || type === 'rescheduled' || type === 'approved') {
+      const left = Math.max(PADDING, Math.min((viewportWidth - MODAL_WIDTH) / 2, viewportWidth - MODAL_WIDTH - PADDING))
+      const top = Math.max(window.scrollY + PADDING, window.scrollY + 120)
+      return {
+        width: MODAL_WIDTH,
+        position: 'absolute',
+        left,
+        top
+      }
+    }
+
+    // Default: try to position adjacent to the triggering button (anchorRect)
+    let left = anchorRect.left + anchorRect.width + 12
+
+    if (left + MODAL_WIDTH > viewportWidth - PADDING) {
+      left = anchorRect.left - MODAL_WIDTH - 12
+      if (left < PADDING) {
+        left = Math.min(
+          Math.max(PADDING, anchorRect.left + anchorRect.width / 2 - MODAL_WIDTH / 2),
+          viewportWidth - MODAL_WIDTH - PADDING
+        )
+      }
+    }
+
+    let top = anchorRect.top + anchorRect.height + 12
+    const maxTop = window.scrollY + viewportHeight - 24 - 380
+    if (top > maxTop) {
+      top = Math.max(window.scrollY + PADDING, anchorRect.top - 380 - 12)
+    }
+
+    return {
+      width: MODAL_WIDTH,
+      position: 'absolute',
+      left,
+      top
+    }
+  }
+
+  const dialogStyle = getPositionStyle()
+  const handleClose = (immediate = false) => {
+    if (immediate) setRendered(false)
+    try { onClose() } catch (e) { /* no-op */ }
+  }
+
+  const wrapperOpacity = open ? 'opacity-100' : 'opacity-0'
+  const wrapperPointer = open ? '' : 'pointer-events-none'
+  const innerBase = 'glass-card w-full p-6 shadow-2xl transition-all duration-100'
+  const mobileTransform = open ? 'translate-y-0 rounded-t-2xl' : 'translate-y-full rounded-t-2xl'
+  const desktopTransform = open ? 'translate-y-0 scale-100' : 'translate-y-2 scale-95'
+  const innerClasses = `${innerBase} ${isMobile ? mobileTransform : desktopTransform}`
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="glass-card w-full max-w-lg p-6">
+    <div
+      className={`fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 sm:py-10 ${wrapperOpacity} ${wrapperPointer}`}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(false) }}
+      style={{ transition: 'opacity 100ms cubic-bezier(0.2,0,0,1)' }}
+    >
+      <div className={innerClasses} style={dialogStyle}>
         <div className="mb-4">
           <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            {marksheet.studentDetails?.name} • {marksheet.studentDetails?.regNumber}
-          </p>
+          <p className="text-sm text-gray-600 mt-1">{marksheet.studentDetails?.name} • {marksheet.studentDetails?.regNumber}</p>
         </div>
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Comments (optional)</label>
-            <textarea
-              value={comments}
-              onChange={(e) => setComments(e.target.value)}
-              rows={4}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
-              placeholder={type === 'rejected' ? 'Let the staff know the reason for rejection' : 'Add any notes for the staff member'}
-            />
+            <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4} className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none" placeholder={type === 'rejected' ? 'Let the staff know the reason for rejection' : 'Add any notes for the staff member'} />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Schedule (optional)</label>
-            <input
-              type="datetime-local"
-              value={scheduledDate}
-              onChange={(e) => setScheduledDate(e.target.value)}
-              required={isReschedule}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none"
-            />
-            {isReschedule && (
-              <p className="text-xs text-gray-500 mt-2">Provide the new date/time for dispatch. This will be visible to the staff member.</p>
-            )}
+            <input type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} required={isReschedule} className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none" />
+            {isReschedule && (<p className="text-xs text-gray-500 mt-2">Provide the new date/time for dispatch. This will be visible to the staff member.</p>)}
           </div>
 
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-          )}
+          {error && (<div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>)}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading} className={`px-5 py-2 rounded-lg text-white ${loading ? 'bg-blue-300 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {loading ? 'Saving...' : 'Confirm'}
-            </button>
+          <div className={`flex ${isMobile ? 'flex-col-reverse gap-2' : 'justify-end gap-3'} pt-2`}>
+            <button type="button" onClick={() => handleClose(true)} className={`px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 ${isMobile ? 'w-full text-center' : ''}`}>Cancel</button>
+            <button type="submit" disabled={loading} className={`px-5 py-2 rounded-lg text-white ${loading ? 'bg-blue-300 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'} ${isMobile ? 'w-full text-center' : ''}`}>{loading ? 'Saving...' : 'Confirm'}</button>
           </div>
         </form>
       </div>
@@ -552,3 +697,85 @@ function ActionDialog({ open, type, marksheet, onClose, onSubmit, loading, error
 }
 
 export default ApprovalRequests
+
+function BulkRescheduleDialog({ open, onClose, onSubmit, loading }) {
+  const [comments, setComments] = useState('')
+  const [scheduledDate, setScheduledDate] = useState('')
+  const [isMobile, setIsMobile] = useState(() => (typeof window !== 'undefined' ? window.innerWidth < 640 : true))
+  const [rendered, setRendered] = useState(open)
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    if (open) setRendered(true)
+    else {
+      const t = setTimeout(() => setRendered(false), 120)
+      return () => clearTimeout(t)
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      setComments('')
+      setScheduledDate('')
+    }
+  }, [open])
+
+  if (!rendered) return null
+
+  const submit = (e) => {
+    e.preventDefault()
+    if (!scheduledDate) return
+    const iso = new Date(scheduledDate)
+    if (Number.isNaN(iso.getTime())) return
+    // Optimistically close the bulk dialog immediately to avoid UI lag
+    try { handleCloseBulk(true) } catch (err) { /* ignore */ }
+    onSubmit({ comments: comments.trim(), scheduledDispatchDate: iso.toISOString() })
+  }
+
+  const wrapperOpacity = open ? 'opacity-100' : 'opacity-0'
+  const wrapperPointer = open ? '' : 'pointer-events-none'
+  const innerBase = 'glass-card w-full max-w-md p-6 shadow-2xl transition-all duration-100'
+  const mobileTransform = open ? 'translate-y-0 rounded-t-2xl' : 'translate-y-full rounded-t-2xl'
+  const desktopTransform = open ? 'translate-y-0 scale-100' : 'translate-y-2 scale-95'
+  const innerClasses = `${innerBase} ${isMobile ? mobileTransform : desktopTransform}`
+
+  const dialogStyle = isMobile ? { position: 'fixed', left: 0, right: 0, bottom: 0 } : { position: 'absolute', top: window.scrollY + 120 }
+
+  const handleCloseBulk = (immediate = false) => {
+    if (immediate) setRendered(false)
+    try { onClose() } catch (e) { /* no-op */ }
+  }
+
+  return (
+    <div className={`fixed inset-0 z-50 flex items-start justify-center bg-black/40 px-4 py-6 sm:py-10 ${wrapperOpacity} ${wrapperPointer}`} onClick={(e) => { if (e.target === e.currentTarget) handleCloseBulk(false) }} style={{ transition: 'opacity 100ms cubic-bezier(0.2,0,0,1)' }}>
+      <div className={innerClasses} style={dialogStyle}>
+        <div className="mb-4">
+          <h3 className="text-xl font-semibold text-gray-900">Reschedule all pending requests</h3>
+          <p className="text-sm text-gray-600 mt-1">Provide a new schedule date/time and optional comments for all pending requests.</p>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Comments (optional)</label>
+            <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={3} className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none" placeholder="Notes for the staff members" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Schedule (required)</label>
+            <input type="datetime-local" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} required className="w-full rounded-lg border border-gray-200 px-3 py-2 focus:border-blue-500 focus:outline-none" />
+            <p className="text-xs text-gray-500 mt-2">This date/time will be applied to all selected requests.</p>
+          </div>
+
+          <div className={`flex ${isMobile ? 'flex-col-reverse gap-2' : 'justify-end gap-3'} pt-2`}>
+            <button type="button" onClick={() => handleCloseBulk(true)} className={`px-4 py-2 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100 ${isMobile ? 'w-full text-center' : ''}`}>Cancel</button>
+            <button type="submit" disabled={loading} className={`px-5 py-2 rounded-lg text-white ${loading ? 'bg-blue-300 cursor-wait' : 'bg-blue-600 hover:bg-blue-700'} ${isMobile ? 'w-full text-center' : ''}`}>{loading ? 'Rescheduling...' : 'Confirm'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

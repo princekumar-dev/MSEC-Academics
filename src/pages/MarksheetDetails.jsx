@@ -288,7 +288,8 @@ function VerifyButton({ marksheet, onVerified }) {
   }, [marksheet])
   const lockedStatuses = ['approved_by_hod', 'rejected_by_hod', 'dispatched', 'rescheduled_by_hod']
   const handleVerify = async () => {
-    // Refresh user data from localStorage to get the latest signature
+    // Refresh user data from localStorage to get the latest signature,
+    // fallback to server profile when signature is missing
     let currentUserData = userData
     try {
       const auth = localStorage.getItem('auth')
@@ -297,6 +298,22 @@ function VerifyButton({ marksheet, onVerified }) {
       }
     } catch (e) {
       console.error('Error refreshing user data:', e)
+    }
+
+    if (!currentUserData?.eSignature) {
+      const userId = currentUserData?._id || currentUserData?.id || localStorage.getItem('userId')
+      if (userId) {
+        try {
+          const profileRes = await fetch(`/api/users?action=profile&userId=${userId}`)
+          const profileData = await profileRes.json()
+          if (profileRes.ok && profileData.success && profileData.user) {
+            currentUserData = { ...currentUserData, ...profileData.user }
+            localStorage.setItem('auth', JSON.stringify(currentUserData))
+          }
+        } catch (profileErr) {
+          console.error('Error fetching user profile:', profileErr)
+        }
+      }
     }
     
     // Check if user has uploaded signature
