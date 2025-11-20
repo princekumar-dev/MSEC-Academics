@@ -1,4 +1,5 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
+import * as XLSX from 'xlsx'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import { TableSkeleton } from '../components/SkeletonLoaders'
@@ -146,6 +147,43 @@ function Marksheets() {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0])
     }
+  }
+
+  const downloadTemplate = () => {
+    const headers = [
+      'Name',
+      'RegNumber',
+      'Year',
+      'Section',
+      'ParentPhone',
+      'Engineerir',
+      'Data Struc',
+      'Database',
+      'Computer',
+      'Object Ori',
+      'Digital Log',
+      'Operating Software E',
+      'Computer Web Technologies'
+    ]
+
+    const sampleRows = [
+      ['Umaiyasw', '21CSE001', 'II', 'A', '8388520784', 85, 88, 82, 79, 91, 87, 84, 89],
+      ['Rohith S', '21CSE002', 'II', 'A', '8754401180', 78, 85, 81, 76, 88, 83, 79, 86],
+      ['Prince R', '21CSE003', 'II', 'B', '8778439728', 92, 94, 89, 87, 95, 91, 88, 93]
+    ]
+
+    const guidanceRow = [
+      '← Replace with student details (marks must be 0-100, use AB for absentees)',
+      ...Array(headers.length - 1).fill('')
+    ]
+
+    const workbook = XLSX.utils.book_new()
+    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows, guidanceRow])
+    worksheet['!merges'] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: headers.length - 1 } }]
+    worksheet['!cols'] = headers.map(() => ({ wch: 18 }))
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template')
+    XLSX.writeFile(workbook, 'marks-import-template.xlsx')
   }
 
   const handleCreateExamination = async () => {
@@ -626,8 +664,9 @@ function Marksheets() {
               </div>
 
               {/* Download Template */}
-              <a
-                href="/api/demo-excel"
+              <button
+                type="button"
+                onClick={downloadTemplate}
                 className="glass-button inline-flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 text-gray-600 rounded-xl sm:rounded-2xl font-bold text-sm sm:text-lg transition-colors duration-300 w-full sm:w-auto justify-center"
               >
                 <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -635,7 +674,7 @@ function Marksheets() {
                 </svg>
                 <span className="hidden sm:inline">Download Template</span>
                 <span className="sm:hidden">Template</span>
-              </a>
+              </button>
 
               {/* Upload (show when a file is selected) */}
               {file && (
