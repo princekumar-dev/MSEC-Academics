@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import ReactDOM from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from './AlertContext'
@@ -218,36 +218,64 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
     localStorage.setItem('userSettings', JSON.stringify(newSettings))
   }
 
-  // Signature drawing functions
-  const startDrawing = (e) => {
+  // Signature drawing functions (stable via useCallback)
+  const startDrawing = useCallback((e) => {
     if (!canvasRef.current) return
+    try { e.preventDefault() } catch (err) { /* ignore */ }
     setIsDrawing(true)
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const rect = canvas.getBoundingClientRect()
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
+    const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.pageX)
+    const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.pageY)
+    const x = clientX - rect.left
+    const y = clientY - rect.top
     ctx.beginPath()
     ctx.moveTo(x, y)
-  }
+  }, [canvasRef])
 
-  const draw = (e) => {
+  const draw = useCallback((e) => {
     if (!isDrawing || !canvasRef.current) return
+    try { e.preventDefault() } catch (err) { /* ignore */ }
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const rect = canvas.getBoundingClientRect()
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top
+    const clientX = e.touches ? e.touches[0].clientX : (e.clientX ?? e.pageX)
+    const clientY = e.touches ? e.touches[0].clientY : (e.clientY ?? e.pageY)
+    const x = clientX - rect.left
+    const y = clientY - rect.top
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.strokeStyle = '#000'
     ctx.lineTo(x, y)
     ctx.stroke()
-  }
+  }, [isDrawing, canvasRef])
 
-  const stopDrawing = () => {
+  const stopDrawing = useCallback(() => {
     setIsDrawing(false)
-  }
+  }, [])
+
+  // Pointer-based handlers (more reliable on mobile)
+  const pointerStart = useCallback((e) => {
+    if (!canvasRef.current) return
+    try { e.preventDefault() } catch (err) {}
+    const canvas = canvasRef.current
+    canvas.setPointerCapture?.(e.pointerId)
+    startDrawing(e)
+  }, [canvasRef, startDrawing])
+
+  const pointerMove = useCallback((e) => {
+    // Only draw when pointer is active
+    if (!isDrawing) return
+    draw(e)
+  }, [isDrawing, draw])
+
+  const pointerEnd = useCallback((e) => {
+    try { e.preventDefault() } catch (err) {}
+    const canvas = canvasRef.current
+    canvas?.releasePointerCapture?.(e.pointerId)
+    stopDrawing()
+  }, [canvasRef, stopDrawing])
 
   const clearSignature = () => {
     if (signatureMode === 'draw' && canvasRef.current) {
@@ -260,6 +288,56 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       }
     }
   }
+
+  // Initialize canvas for devicePixelRatio and attach pointer/touch handlers
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // Ensure we only initialize once to avoid wiping user drawing
+    const initRef = canvas.__initialized || { value: false }
+    if (initRef.value) return
+
+    const ctx = canvas.getContext('2d')
+    const ratio = window.devicePixelRatio || 1
+    const w = 400
+    const h = 160
+
+    // Set actual pixel size while keeping CSS size stable
+    canvas.width = Math.round(w * ratio)
+    canvas.height = Math.round(h * ratio)
+    canvas.style.width = w + 'px'
+    canvas.style.height = h + 'px'
+    ctx.scale(ratio, ratio)
+
+    // Fill background white (so exported PNG has white background)
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, w, h)
+
+    // Attach pointer events for more reliable touch drawing
+    canvas.addEventListener('pointerdown', pointerStart)
+    canvas.addEventListener('pointermove', pointerMove)
+    canvas.addEventListener('pointerup', pointerEnd)
+    canvas.addEventListener('pointercancel', pointerEnd)
+
+    // Prevent default touch scrolling while interacting with canvas
+    const passiveHandler = (e) => { try { e.preventDefault() } catch (err) {} }
+    canvas.addEventListener('touchstart', passiveHandler, { passive: false })
+    canvas.addEventListener('touchmove', passiveHandler, { passive: false })
+
+    // mark initialized to avoid reinit
+    canvas.__initialized = initRef
+    initRef.value = true
+
+    return () => {
+      canvas.removeEventListener('pointerdown', pointerStart)
+      canvas.removeEventListener('pointermove', pointerMove)
+      canvas.removeEventListener('pointerup', pointerEnd)
+      canvas.removeEventListener('pointercancel', pointerEnd)
+      canvas.removeEventListener('touchstart', passiveHandler)
+      canvas.removeEventListener('touchmove', passiveHandler)
+    }
+  }, [canvasRef, pointerStart, pointerMove, pointerEnd])
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0]
