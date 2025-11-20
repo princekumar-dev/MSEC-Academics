@@ -1036,7 +1036,12 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
       {/* Signature Modal */}
       {showSignatureModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={(e) => { e.stopPropagation(); }}
+          onTouchStart={(e) => { e.stopPropagation(); }}
+          onTouchEnd={(e) => { e.stopPropagation(); }}
+        >
           <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Add Your Signature</h2>
             <p className="text-sm text-gray-600 mb-5">This signature will be used in generated PDFs</p>
@@ -1045,6 +1050,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
             <div className="flex gap-2 mb-5 bg-gray-100 p-1 rounded-lg">
               <button
                 onClick={() => setSignatureMode('draw')}
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchEnd={(e) => { e.stopPropagation(); }}
                 className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
                   signatureMode === 'draw'
                     ? 'bg-white text-gray-900 shadow-md'
@@ -1055,6 +1062,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               </button>
               <button
                 onClick={() => setSignatureMode('upload')}
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchEnd={(e) => { e.stopPropagation(); }}
                 className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
                   signatureMode === 'upload'
                     ? 'bg-white text-gray-900 shadow-md'
@@ -1124,6 +1133,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
             <div className="flex gap-2">
               <button
                 onClick={clearSignature}
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200 font-semibold text-sm transition-colors"
               >
                 Clear
@@ -1135,12 +1146,16 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   setUploadedSignature(null)
                   if (fileInputRef.current) fileInputRef.current.value = ''
                 }}
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200 font-semibold text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={saveSignature}
+                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 font-semibold text-sm transition-colors shadow-md hover:shadow-lg"
               >
                 Save
