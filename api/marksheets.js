@@ -216,22 +216,40 @@ export default async function handler(req, res) {
       if (action === 'verify') {
         const { marksheetId, staffSignature } = req.body
         
-        const marksheet = await Marksheet.findByIdAndUpdate(
-          marksheetId,
-          { 
-            status: 'verified_by_staff',
-            staffSignature,
-            updatedAt: new Date()
-          },
-          { new: true }
-        )
+        if (!marksheetId) {
+          return res.status(400).json({ success: false, error: 'marksheetId is required' })
+        }
 
+        const marksheet = await Marksheet.findById(marksheetId)
         if (!marksheet) {
           return res.status(404).json({ success: false, error: 'Marksheet not found' })
         }
+
+        let staffDoc = null
+        if (marksheet.staffId) {
+          staffDoc = await User.findById(marksheet.staffId).select('name email department eSignature')
+        }
+
+        let resolvedSignature = typeof staffSignature === 'string' && staffSignature.trim().length > 0
+          ? staffSignature
+          : null
+
+        if (!resolvedSignature) {
+          resolvedSignature = staffDoc?.eSignature || null
+        }
+
+        if (!resolvedSignature) {
+          return res.status(400).json({ success: false, error: 'Staff signature not available. Please upload your signature in Settings.' })
+        }
+
+        marksheet.status = 'verified_by_staff'
+        marksheet.staffSignature = resolvedSignature
+        marksheet.updatedAt = new Date()
+        await marksheet.save()
+
         // Notify HOD when all marksheets for the class are verified
         try {
-          const staff = await User.findById(marksheet.staffId)
+          const staff = staffDoc || await User.findById(marksheet.staffId)
           const year = marksheet.studentDetails?.year
           const dept = marksheet.studentDetails?.department
           if (staff && year && dept) {

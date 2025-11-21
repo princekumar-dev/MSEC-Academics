@@ -14,6 +14,34 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      const { action, userId } = req.query
+
+      if (action === 'profile') {
+        if (!userId) {
+          return res.status(400).json({ success: false, error: 'userId is required' })
+        }
+
+        const user = await User.findById(userId).lean()
+        if (!user) {
+          return res.status(404).json({ success: false, error: 'User not found' })
+        }
+
+        return res.status(200).json({
+          success: true,
+          user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            department: user.department,
+            year: user.year,
+            section: user.section,
+            phoneNumber: user.phoneNumber,
+            eSignature: user.eSignature
+          }
+        })
+      }
+
       // list users for academic system
       const users = await User.find().sort({ createdAt: -1 }).lean()
       // Remove sensitive fields before sending to client

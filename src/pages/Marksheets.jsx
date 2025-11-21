@@ -333,23 +333,15 @@ function Marksheets() {
         return
       }
       
-      // Refresh user data from localStorage before checking signature
+      // Refresh user data from localStorage to get latest signature info (if available)
       const currentUserData = await refreshUserData()
-      
-      // Check if user has uploaded signature
-      if (!currentUserData?.eSignature) {
-        showError('Signature Required', 'Please upload your signature in Settings before verifying marksheets')
-        setVerifyingAll(false)
-        return
-      }
-      
-      const staffSignature = currentUserData.eSignature
+      const staffSignature = currentUserData?.eSignature || null
       await Promise.all(candidates.map(async (m) => {
         try {
           const res = await fetch('/api/marksheets?action=verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ marksheetId: m._id, staffSignature })
+            body: JSON.stringify(staffSignature ? { marksheetId: m._id, staffSignature } : { marksheetId: m._id })
           })
           await res.json().catch(() => ({}))
         } catch {}
@@ -376,17 +368,9 @@ function Marksheets() {
         return
       }
       
-      // Refresh user data from localStorage before checking signature
+      // Refresh user data to get the latest signature if present
       const currentUserData = await refreshUserData()
-      
-      // Check if user has uploaded signature
-      if (!currentUserData?.eSignature) {
-        showError('Signature Required', 'Please upload your signature in Settings before verifying marksheets')
-        setVerifyingAll(false)
-        return
-      }
-      
-      const staffSignature = currentUserData.eSignature
+      const staffSignature = currentUserData?.eSignature || null
 
       await Promise.all(candidates.map(async (m) => {
         try {
@@ -394,7 +378,7 @@ function Marksheets() {
           const vRes = await fetch('/api/marksheets?action=verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ marksheetId: m._id, staffSignature })
+            body: JSON.stringify(staffSignature ? { marksheetId: m._id, staffSignature } : { marksheetId: m._id })
           })
           const vData = await vRes.json().catch(() => ({}))
 

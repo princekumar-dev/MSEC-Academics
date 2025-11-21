@@ -316,20 +316,14 @@ function VerifyButton({ marksheet, onVerified }) {
       }
     }
     
-    // Check if user has uploaded signature
-    if (!currentUserData?.eSignature) {
-      setError('Please upload your signature in Settings before verifying marksheets')
-      return
-    }
-    
     setLoading(true)
     setError('')
     try {
-      const staffSignature = currentUserData.eSignature
+      const staffSignature = currentUserData?.eSignature || null
       const res = await fetch('/api/marksheets?action=verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ marksheetId: marksheet._id, staffSignature })
+        body: JSON.stringify(staffSignature ? { marksheetId: marksheet._id, staffSignature } : { marksheetId: marksheet._id })
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
