@@ -190,6 +190,7 @@ function SignUp() {
                   <option value="CSE">Computer Science & Engineering</option>
                   <option value="AI_DS">Artificial Intelligence & Datascience</option>
                   <option value="ECE">Electronics & Communication Engineering</option>
+                  <option value="IT">Information Technology</option>
                   <option value="MECH">Mechanical Engineering</option>
                   <option value="CIVIL">Civil Engineering</option>
                   <option value="EEE">Electrical & Electronics Engineering</option>
