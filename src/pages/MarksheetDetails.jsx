@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useAlert } from '../components/AlertContext'
 import { useParams, useNavigate } from 'react-router-dom'
 import { deriveOverallResult, deriveSubjectResult } from '../utils/resultUtils'
 
@@ -287,6 +288,8 @@ function VerifyButton({ marksheet, onVerified }) {
     else setVerified(false)
   }, [marksheet])
   const lockedStatuses = ['approved_by_hod', 'rejected_by_hod', 'dispatched', 'rescheduled_by_hod']
+  const { showError } = useAlert()
+
   const handleVerify = async () => {
     // Refresh user data from localStorage to get the latest signature,
     // fallback to server profile when signature is missing
@@ -320,6 +323,13 @@ function VerifyButton({ marksheet, onVerified }) {
     setError('')
     try {
       const staffSignature = currentUserData?.eSignature || null
+
+      if (!staffSignature) {
+        // Show red toast prompting user to add signature
+        try { showError('Signature Missing', 'Please add your signature in Settings before verifying this marksheet') } catch (e) {}
+        setLoading(false)
+        return
+      }
       const res = await fetch('/api/marksheets?action=verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
