@@ -61,6 +61,26 @@ function ApprovalRequests() {
     }
   }
 
+  // Ensure the HOD has an electronic signature saved. Returns the latest userData with signature.
+  const ensureHodSignature = async () => {
+    try {
+      if (userData?.eSignature) return userData
+      const hodId = userData?._id || userData?.id
+      if (!hodId) return null
+      const profileRes = await fetch(`/api/users?action=profile&userId=${hodId}`)
+      const profileData = await profileRes.json()
+      if (profileRes.ok && profileData.success && profileData.user) {
+        const updated = { ...userData, ...profileData.user }
+        try { localStorage.setItem('auth', JSON.stringify(updated)) } catch (e) {}
+        setUserData(updated)
+        return updated
+      }
+    } catch (e) {
+      console.error('[ApprovalRequests] Failed to refresh HOD profile:', e)
+    }
+    return userData
+  }
+
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
@@ -94,6 +114,13 @@ function ApprovalRequests() {
     if (!actionModal.marksheet || !actionModal.type) return
     try {
       setActionLoading(true)
+      // Ensure HOD has a saved signature before allowing approve/reschedule/reject
+      const latest = await ensureHodSignature()
+      if (!latest?.eSignature) {
+        showError('Signature Missing', 'Please add your signature in Settings before approving or rescheduling')
+        setActionLoading(false)
+        return
+      }
       const hodId = userData._id || userData.id
       const res = await fetch('/api/marksheets?action=hod-response', {
         method: 'POST',
@@ -141,6 +168,12 @@ function ApprovalRequests() {
     }
 
     try {
+      // Ensure HOD has a saved signature before bulk actions
+      const latest = await ensureHodSignature()
+      if (!latest?.eSignature) {
+        showError('Signature Missing', 'Please add your signature in Settings before approving or rescheduling')
+        return
+      }
       setBulkActionLoading(true)
       setActionError('')
       const hodId = userData._id || userData.id
@@ -469,6 +502,13 @@ function ApprovalRequests() {
             return
           }
           try {
+            // Ensure HOD has signature
+            const latest = await ensureHodSignature()
+            if (!latest?.eSignature) {
+              showError('Signature Missing', 'Please add your signature in Settings before approving or rescheduling')
+              setBulkRescheduleOpen(false)
+              return
+            }
             setBulkRescheduleLoading(true)
             const hodId = userData._id || userData.id
             const promises = targetRequests.map(marksheet => 
