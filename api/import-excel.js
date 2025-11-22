@@ -71,8 +71,21 @@ export default async function handler(req, res) {
           // Accept optional examinationName and examinationDate in form; they can also be present in the Excel
           const { staffId, examinationDate, examinationName, department, year: yearParam, semester } = req.body
 
-          if (!staffId || !department || !yearParam) {
-            return res.status(400).json({ success: false, error: 'staffId, department, and year are required' })
+          if (!staffId || !yearParam) {
+            return res.status(400).json({ success: false, error: 'staffId and year are required' })
+          }
+
+          // Prefer department configured on the staff profile (authoritative). Fall back to client value.
+          let resolvedDepartment = department || null
+          try {
+            const staffRec = await User.findById(staffId).select('department').lean()
+            if (staffRec && staffRec.department) resolvedDepartment = staffRec.department
+          } catch (e) {
+            console.error('[ImportExcel] staff lookup failed:', e && e.message)
+          }
+
+          if (!resolvedDepartment) {
+            return res.status(400).json({ success: false, error: 'department is required (either in form or configured on staff profile)' })
           }
 
           try {
@@ -165,7 +178,7 @@ export default async function handler(req, res) {
             // Create import session
             const importSession = new ImportSession({
               staffId,
-              department,
+              department: resolvedDepartment,
               year: yearParam,
               semester: semester,
               examinationName: derivedExamName,
@@ -257,7 +270,10 @@ export default async function handler(req, res) {
                 regNumber: student.regNumber,
                 year: student.year,
                 section: student.section,
-                department: student.department,
+                // Use the import session's department for this marksheet so it belongs
+                // to the importing staff's department even if the Student record
+                // has a different department.
+                department: session.department || student.department,
                 parentPhoneNumber: student.parentPhoneNumber,
                 examinationName: student.examinationName,
                 examinationDate: student.examinationDate
