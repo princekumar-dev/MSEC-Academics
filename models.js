@@ -8,7 +8,7 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   department: {
     type: String,
-    enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE'],
+    enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT'],
     required: true
   },
   year: { type: String }, // For staff - which year they handle (I, II, III, IV, etc.)
@@ -24,7 +24,7 @@ const StudentSchema = new mongoose.Schema({
   regNumber: { type: String, required: true, unique: true },
   year: { type: String, required: true },
   section: { type: String, required: true },
-  department: { type: String, enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE'], required: true },
+  department: { type: String, enum: ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT'], required: true },
   parentPhoneNumber: { type: String, required: true },
   // Optional fields populated from import sessions
   examinationName: { type: String },
