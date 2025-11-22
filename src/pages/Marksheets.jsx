@@ -322,20 +322,29 @@ function Marksheets() {
     }
   }
 
-  const verifyAll = async () => {
-    if (!marksheets || marksheets.length === 0) return
+  // Verify all marksheets. If `examName` is provided, restrict to that examination's group.
+  const verifyAll = async (examName = null) => {
+    const source = examName ? (groupedMarksheets[examName] || []) : marksheets
+    if (!source || source.length === 0) return
     setVerifyingAll(true)
     try {
-      const candidates = marksheets.filter(m => m.status !== 'verified_by_staff')
+      const candidates = source.filter(m => m.status !== 'verified_by_staff')
       if (candidates.length === 0) {
         showInfo('Already Verified', 'All marksheets are already verified')
         setVerifyingAll(false)
         return
       }
-      
+
       // Refresh user data from localStorage to get latest signature info (if available)
       const currentUserData = await refreshUserData()
       const staffSignature = currentUserData?.eSignature || null
+
+      // Require an electronic signature before verifying
+      if (!staffSignature) {
+        showError('Signature Missing', 'Please add your signature in Settings before verifying marksheets')
+        setVerifyingAll(false)
+        return
+      }
       await Promise.all(candidates.map(async (m) => {
         try {
           const res = await fetch('/api/marksheets?action=verify', {
@@ -357,20 +366,29 @@ function Marksheets() {
   }
 
   // New: verify all and immediately request dispatch for each verified marksheet
-  const verifyAndRequest = async () => {
-    if (!marksheets || marksheets.length === 0) return
+  // Verify all and request dispatch. If `examName` is provided, restrict to that examination's group.
+  const verifyAndRequest = async (examName = null) => {
+    const source = examName ? (groupedMarksheets[examName] || []) : marksheets
+    if (!source || source.length === 0) return
     setVerifyingAll(true)
     try {
-      const candidates = marksheets.filter(m => m.status !== 'verified_by_staff')
+      const candidates = source.filter(m => m.status !== 'verified_by_staff')
       if (candidates.length === 0) {
         showInfo('Already Complete', 'All marksheets are already verified')
         setVerifyingAll(false)
         return
       }
-      
+
       // Refresh user data to get the latest signature if present
       const currentUserData = await refreshUserData()
       const staffSignature = currentUserData?.eSignature || null
+
+      // Require an electronic signature before verifying and requesting dispatch
+      if (!staffSignature) {
+        showError('Signature Missing', 'Please add your signature in Settings before verifying marksheets')
+        setVerifyingAll(false)
+        return
+      }
 
       await Promise.all(candidates.map(async (m) => {
         try {
@@ -767,7 +785,7 @@ function Marksheets() {
                   {/* Verify All button for selected examination */}
                   <div className="flex gap-2 sm:gap-3 flex-wrap">
                     <button
-                      onClick={verifyAll}
+                      onClick={() => verifyAll(selectedExamination)}
                       disabled={verifyingAll || areAllMarksheetsVerified(selectedExamination)}
                       className={`inline-flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
                         verifyingAll || areAllMarksheetsVerified(selectedExamination)
@@ -779,7 +797,7 @@ function Marksheets() {
                     </button>
                     
                     <button
-                      onClick={verifyAndRequest}
+                      onClick={() => verifyAndRequest(selectedExamination)}
                       disabled={verifyingAll || areAllMarksheetsVerified(selectedExamination)}
                       className={`inline-flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl font-semibold text-xs sm:text-sm transition-all duration-200 whitespace-nowrap ${
                         verifyingAll || areAllMarksheetsVerified(selectedExamination)
