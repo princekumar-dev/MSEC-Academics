@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { TableSkeleton } from '../components/SkeletonLoaders'
 import { NoMarksheets, NoSearchResults } from '../components/EmptyStates'
 import { useUndoToast } from '../components/UndoToast'
@@ -160,6 +161,10 @@ function Marksheets() {
       console.error('Error fetching examinations:', error)
     }
   }
+
+  // Confirmation modal state for deleting an examination
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmExamDoc, setConfirmExamDoc] = useState(null)
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -362,6 +367,34 @@ function Marksheets() {
       showError('Verification Failed', 'Could not verify all marksheets')
     } finally {
       setVerifyingAll(false)
+    }
+  }
+
+  // Handler invoked when user confirms deletion in the modal
+  const handleConfirmDelete = async () => {
+    if (!confirmExamDoc) return
+    setConfirmOpen(false)
+    try {
+      const staffId = userData?._id || userData?.id || localStorage.getItem('userId')
+      const res = await fetch('/api/examinations', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ examinationId: confirmExamDoc._id, staffId })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        showError('Delete Failed', data.error || 'Could not delete examination')
+        return
+      }
+      // Remove marksheets belonging to this exam from UI and refresh examinations
+      setMarksheets(prev => prev.filter(m => m.examinationName !== confirmExamDoc.examinationName))
+      await fetchExaminations()
+      showSuccess('Deleted', `${data.deleted.marksheets || 0} marksheets and ${data.deleted.students || 0} students removed.`)
+    } catch (err) {
+      console.error('Delete exam error:', err)
+      showError('Error', 'Failed to delete examination')
+    } finally {
+      setConfirmExamDoc(null)
     }
   }
 
@@ -883,10 +916,29 @@ function Marksheets() {
                             </div>
                           </div>
                         </div>
-                        <div className="self-end sm:self-auto text-right">
+                        <div className="self-end sm:self-auto text-right flex items-center gap-2">
                           <svg className="w-5 h-5 sm:w-6 sm:h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
+                          {/* Delete examination button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const examDoc = examinations.find(ex => ex.examinationName === examName)
+                              if (!examDoc) {
+                                showError('Not found', 'Examination metadata not found')
+                                return
+                              }
+                              setConfirmExamDoc(examDoc)
+                              setConfirmOpen(true)
+                            }}
+                            title="Delete examination"
+                            className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-50 text-red-600 hover:bg-red-100 border border-red-100"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-1 12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 7m5 4v6m4-6v6M15 3H9l1 4h4l1-4z" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -903,6 +955,16 @@ function Marksheets() {
       
       {/* Confetti Container */}
       <ConfettiContainer />
+      {/* Confirmation dialog for deleting examinations */}
+      <ConfirmDialog
+        open={confirmOpen}
+        title={confirmExamDoc ? `Delete examination "${confirmExamDoc.examinationName}"?` : 'Delete examination'}
+        description={confirmExamDoc ? `Delete examination "${confirmExamDoc.examinationName}" and all its marksheets and students? This cannot be undone.` : 'Delete this examination and associated data?'}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => { setConfirmOpen(false); setConfirmExamDoc(null) }}
+      />
     </div>
   )
 }

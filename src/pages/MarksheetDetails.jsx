@@ -86,6 +86,18 @@ function MarksheetDetails() {
     }
   }, [marksheet, userData])
 
+  const hodMatchesMarksheet = useMemo(() => {
+    if (!marksheet || !userData || userData.role !== 'hod') return false
+    const hodIdFromMarksheet = marksheet.hodId?._id || marksheet.hodId
+    const userId = userData._id || userData.id
+    if (!hodIdFromMarksheet || !userId) return false
+    try {
+      return String(hodIdFromMarksheet) === String(userId)
+    } catch {
+      return false
+    }
+  }, [marksheet, userData])
+
   const canStaffEdit = userData?.role === 'staff' && staffMatchesMarksheet
   const overallResult = useMemo(() => deriveOverallResult(marksheet), [marksheet])
 
@@ -255,6 +267,24 @@ function MarksheetDetails() {
                   <button onClick={() => setEditMode(true)} className="px-5 py-2 bg-blue-600 text-white rounded-lg transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md w-full sm:w-auto">Edit & Regenerate</button>
                 </>
               )}
+              {/* Refresh signatures button (staff or HOD owners) */}
+              {!editMode && (canStaffEdit || hodMatchesMarksheet) && (
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <RefreshSignaturesButton id={marksheet._id} onRefreshed={setMarksheet} />
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            const ts = Date.now()
+                            const origin = window.location.origin
+                            const url = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}` : `/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}`
+                            window.open(url, '_blank')
+                          }}
+                          className="px-5 py-2 rounded-lg transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md w-full sm:w-auto bg-yellow-600 text-white"
+                        >
+                          Download PDF
+                        </button>
+                </div>
+              )}
               {editMode && canStaffEdit && (
                 <>
                   <button onClick={() => setEditMode(false)} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-lg transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md w-full sm:w-auto">Cancel</button>
@@ -378,7 +408,9 @@ function SaveEditsButton({ id, form, onSaved }) {
       const res = await fetch('/api/marksheets', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ marksheetId: id, studentDetails: form.studentDetails, subjects: form.subjects })
+        // Include regenerateSignatures so "Save & Regenerate" updates the stored
+        // staff/hod signatures from their current profiles when saving edits.
+        body: JSON.stringify({ marksheetId: id, studentDetails: form.studentDetails, subjects: form.subjects, regenerateSignatures: true })
       })
       const data = await res.json()
       if (!res.ok || !data.success) {
@@ -397,6 +429,42 @@ function SaveEditsButton({ id, form, onSaved }) {
       <button disabled={saving} onClick={handleSave} className={`px-5 py-2 rounded-lg transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md w-full sm:w-auto ${saving ? 'bg-blue-200 text-blue-900' : 'bg-blue-600 text-white'}`}>{saving ? 'Saving...' : 'Save Changes'}</button>
       {error && (<span className="text-red-600 text-sm ml-2">{error}</span>)}
     </>
+  )
+}
+
+function RefreshSignaturesButton({ id, onRefreshed }) {
+  const [loading, setLoading] = useState(false)
+  const { showSuccess, showError } = useAlert()
+
+  const handleRefresh = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/marksheets', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ marksheetId: id, regenerateSignatures: true })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        showError('Refresh Failed', data.error || 'Could not refresh signatures')
+      } else {
+        showSuccess('Signatures Refreshed', 'Staff/HOD signatures were updated on this marksheet')
+        if (typeof onRefreshed === 'function') onRefreshed(data.marksheet)
+      }
+    } catch (e) {
+      showError('Refresh Failed', e.message || 'Unexpected error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleRefresh}
+      disabled={loading}
+      className={`px-5 py-2 rounded-lg transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md w-full sm:w-auto ${loading ? 'bg-gray-200 text-gray-800' : 'bg-indigo-600 text-white'}`}>
+      {loading ? 'Refreshing...' : 'Refresh Signatures'}
+    </button>
   )
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import RefreshButton from '../components/RefreshButton'
+import JSZip from 'jszip'
 
 const PUBLIC_BASE_URL =
   import.meta.env.VITE_PUBLIC_BASE_URL ||
@@ -20,9 +21,11 @@ function DispatchRequests() {
   const [marksheets, setMarksheets] = useState([])
   const [loading, setLoading] = useState(true)
   const [batching, setBatching] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [requestingIds, setRequestingIds] = useState([])
   const [dispatchingId, setDispatchingId] = useState(null)
   const [sendingAll, setSendingAll] = useState(false)
+  const [downloadingAll, setDownloadingAll] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
@@ -148,8 +151,8 @@ function DispatchRequests() {
     setDispatchingId(marksheet._id)
     try {
       const origin = getPublicOrigin()
-      const marksheetPdfUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}` : ''
-      const marksheetImageUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&format=jpeg` : ''
+      const marksheetPdfUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${Date.now()}` : ''
+      const marksheetImageUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&format=jpeg&t=${Date.now()}` : ''
       const res = await fetch('/api/whatsapp-dispatch?action=send-marksheet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,8 +196,8 @@ function DispatchRequests() {
       
       for (const marksheet of approvedMarksheets) {
         try {
-          const marksheetPdfUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}` : ''
-          const marksheetImageUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&format=jpeg` : ''
+          const marksheetPdfUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${Date.now()}` : ''
+          const marksheetImageUrl = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&format=jpeg&t=${Date.now()}` : ''
           const res = await fetch('/api/whatsapp-dispatch?action=send-marksheet', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -379,6 +382,121 @@ function DispatchRequests() {
                         </>
                       )}
                     </button>
+
+                    <button
+                      onClick={async () => {
+                        // Download all marksheets currently visible in a ZIP
+                        const candidates = marksheets.filter(m => m.status === 'approved_by_hod' || m.status === 'dispatched' || m.status === 'verified_by_staff' || m.status === 'dispatch_requested' || m.status === 'rescheduled_by_hod')
+                        if (!candidates || candidates.length === 0) return
+                        setFeedback('')
+                        setError('')
+                        setDownloadingAll(true)
+                        try {
+                          const zip = new JSZip()
+                          // Determine zip name: if all candidates share same exam/department/year, use it
+                          const examNames = Array.from(new Set(candidates.map(c => c.examinationName || 'exam')))
+                          const depts = Array.from(new Set(candidates.map(c => c.studentDetails?.department || 'dept')))
+                          const years = Array.from(new Set(candidates.map(c => c.studentDetails?.year || 'year')))
+                          const sections = Array.from(new Set(candidates.map(c => c.studentDetails?.section || 'section')))
+                          let zipName = 'marksheets_' + Date.now()
+                          // Preferred pattern when all candidates share the same exam, dept, year, and section
+                          if (examNames.length === 1 && depts.length === 1 && years.length === 1 && sections.length === 1) {
+                            const ex = examNames[0].replace(/\s+/g, '_')
+                            const dp = String(depts[0]).replace(/\s+/g, '_')
+                            const yr = String(years[0]).replace(/\s+/g, '_')
+                            const sec = String(sections[0]).replace(/\s+/g, '_')
+                            zipName = `${ex}-${dp}-${yr}-${sec}`
+                          } else if (examNames.length === 1 && depts.length === 1 && years.length === 1) {
+                            // If section differs, omit it
+                            zipName = `${examNames[0].replace(/\s+/g, '_')}-${depts[0]}-${years[0]}`
+                          } else if (examNames.length === 1) {
+                            zipName = `${examNames[0].replace(/\s+/g, '_')}`
+                          }
+
+                          // Fetch each PDF and add to zip
+                          for (const sheet of candidates) {
+                            try {
+                              const origin = getPublicOrigin()
+                              const ts = Date.now()
+                              const url = origin ? `${origin}/api/generate-pdf?marksheetId=${sheet._id}&t=${ts}` : `/api/generate-pdf?marksheetId=${sheet._id}&t=${ts}`
+                              const res = await fetch(url)
+                              if (!res.ok) {
+                                console.warn('Failed to fetch PDF for', sheet._id)
+                                continue
+                              }
+                              const arrayBuffer = await res.arrayBuffer()
+                              const filename = `${(sheet.studentDetails?.regNumber || sheet.studentDetails?.name || sheet._id)}_${(sheet.marksheetId || '').toString() || ''}.pdf`.replace(/[^a-zA-Z0-9_\-\.]/g, '_')
+                              zip.file(filename, arrayBuffer)
+                            } catch (e) {
+                              console.error('Error fetching PDF for marksheet', sheet._id, e)
+                            }
+                          }
+
+                          const content = await zip.generateAsync({ type: 'blob' })
+                          const a = document.createElement('a')
+                          const url = URL.createObjectURL(content)
+                          a.href = url
+                          a.download = `${zipName}.zip`
+                          document.body.appendChild(a)
+                          a.click()
+                          a.remove()
+                          URL.revokeObjectURL(url)
+                          setFeedback(`Prepared ${candidates.length} marksheet${candidates.length > 1 ? 's' : ''} in ${zipName}.zip`)
+                        } catch (err) {
+                          console.error('Download all error:', err)
+                          setError('Failed to generate ZIP. Try again.')
+                        } finally {
+                          setDownloadingAll(false)
+                        }
+                      }}
+                      disabled={downloadingAll || marksheets.length === 0}
+                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${downloadingAll || marksheets.length === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 transition-colors'}`}
+                    >
+                      {downloadingAll ? 'Preparing ZIP...' : '📥 Download All (ZIP)'}
+                    </button>
+
+                    <button
+                      onClick={async () => {
+                        // Regenerate signatures/results for all marksheets in the current list
+                        const candidates = marksheets
+                        if (!candidates || candidates.length === 0) return
+                        setFeedback('')
+                        setError('')
+                        setRegenerating(true)
+                        try {
+                          const results = []
+                          for (const sheet of candidates) {
+                            try {
+                              const res = await fetch('/api/marksheets', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ marksheetId: sheet._id, regenerateSignatures: true, recomputeResults: true })
+                              })
+                              const data = await res.json()
+                              if (res.ok && data.success) {
+                                results.push({ success: true, id: sheet._id })
+                              } else {
+                                results.push({ success: false, id: sheet._id, error: data.error || data.details })
+                              }
+                            } catch (err) {
+                              results.push({ success: false, id: sheet._id, error: err.message })
+                            }
+                          }
+
+                          const successCount = results.filter(r => r.success).length
+                          const failCount = results.length - successCount
+                          if (successCount > 0) setFeedback(`Regenerated ${successCount} marksheet${successCount > 1 ? 's' : ''}.`)
+                          if (failCount > 0) setError(`Failed to regenerate ${failCount} marksheet${failCount > 1 ? 's' : ''}.`)
+                        } finally {
+                          setRegenerating(false)
+                          await fetchVerifiedMarksheets()
+                        }
+                      }}
+                      disabled={regenerating || marksheets.length === 0}
+                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${regenerating || marksheets.length === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-yellow-500 text-white hover:bg-yellow-600 transition-colors'}`}
+                    >
+                      {regenerating ? 'Regenerating...' : '🔁 Regenerate All'}
+                    </button>
                   </div>
                   
                   <div className="self-end sm:self-auto">
@@ -449,6 +567,21 @@ function DispatchRequests() {
                                 className={`w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-white text-xs sm:text-sm transition-colors duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-offset-1 ${dispatchingId === marksheet._id ? 'bg-green-300 cursor-wait' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'}`}
                               >
                                 {dispatchingId === marksheet._id ? 'Sending…' : 'Send via WhatsApp'}
+                              </button>
+                            )}
+
+                            {marksheet.status === 'approved_by_hod' && (
+                              <button
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  const ts = Date.now()
+                                  const origin = getPublicOrigin()
+                                  const url = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}` : `/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}`
+                                  window.open(url, '_blank')
+                                }}
+                                className="mt-2 block w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-yellow-600 border border-yellow-300 bg-white hover:bg-yellow-50 hover:border-yellow-400 text-center text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
+                              >
+                                Download PDF
                               </button>
                             )}
 
