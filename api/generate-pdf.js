@@ -54,7 +54,7 @@ const decodeBase64Image = (dataUrl) => {
 }
 
 // Function to generate PDF using PDFKit
-const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, principalSignature, staffName, hodName) => {
+const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName, hodName) => {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 })
@@ -315,11 +315,10 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, principal
 
       // Signature section with more spacing from content
       const signatureY = doc.page.height - doc.page.margins.bottom - 70
-      const slotWidth = contentWidth / 3
+      const slotWidth = contentWidth / 2
       const signatureSlots = [
         { label: 'Signature of Staff', name: staffName || 'Staff Name', image: staffSignature },
-        { label: 'Signature of HOD', name: hodName || 'HOD Name', image: hodSignature },
-        { label: 'Signature of Principal', name: 'Dr. S V Saravanan', image: principalSignature }
+        { label: 'Signature of HOD', name: hodName || 'HOD Name', image: hodSignature }
       ]
 
       signatureSlots.forEach((slot, index) => {
@@ -408,6 +407,10 @@ export default async function handler(req, res) {
         if (outputFormat === 'jpeg' || outputFormat === 'jpg' || outputFormat === 'image') {
           try {
             const jpegBuffer = await convertPdfToJpeg(cached.buffer)
+            // Prevent browser caching so regenerated PDFs are always requested
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            res.setHeader('Pragma', 'no-cache')
+            res.setHeader('Expires', '0')
             res.setHeader('Content-Type', 'image/jpeg')
             res.setHeader('Content-Disposition', `inline; filename="marksheet_${marksheet.studentDetails.regNumber}_${marksheet.marksheetId}.jpg"`)
             res.setHeader('Content-Length', jpegBuffer.length)
@@ -417,6 +420,10 @@ export default async function handler(req, res) {
             console.error('JPEG conversion error (cache):', err)
           }
         }
+        // Prevent browser caching so regenerated PDFs are always requested
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="marksheet_${marksheet.studentDetails.regNumber}_${marksheet.marksheetId}.pdf"`)
         res.setHeader('Content-Length', cached.buffer.length)
@@ -424,18 +431,24 @@ export default async function handler(req, res) {
         return res.status(200).send(cached.buffer)
       }
 
-      // Get signatures and names
+      // Get signatures and names. Prefer signatures stored on the marksheet
+      // (these are refreshed by the regenerate flow) and fall back to the
+      // user's profile signature if the marksheet field is not present.
       const staffData = marksheet.staffId
-      const staffSignature = staffData?.eSignature || null
-      const staffName = staffData?.name || 'Staff Name'
+      const staffSignature = (marksheet.staffSignature && marksheet.staffSignature.length > 0)
+        ? marksheet.staffSignature
+        : (staffData?.eSignature || null)
+      const staffName = marksheet.staffName || staffData?.name || 'Staff Name'
       const hodData = marksheet.hodId
-      const hodSignature = hodData?.eSignature || null
-      const hodName = hodData?.name || 'HOD Name'
+      const hodSignature = (marksheet.hodSignature && marksheet.hodSignature.length > 0)
+        ? marksheet.hodSignature
+        : (hodData?.eSignature || null)
+      const hodName = marksheet.hodName || hodData?.name || 'HOD Name'
       const principalSignature = process.env.PRINCIPAL_SIGNATURE_URL || null
 
       try {
         // Generate PDF using PDFKit
-        const pdfBuffer = await generateMarksheetPDF(marksheet, staffSignature, hodSignature, principalSignature, staffName, hodName)
+        const pdfBuffer = await generateMarksheetPDF(marksheet, staffSignature, hodSignature, staffName, hodName)
 
         // Cache the PDF
         if (pdfCache.size >= CACHE_MAX_SIZE) {
@@ -450,6 +463,10 @@ export default async function handler(req, res) {
         if (outputFormat === 'jpeg' || outputFormat === 'jpg' || outputFormat === 'image') {
           try {
             const jpegBuffer = await convertPdfToJpeg(pdfBuffer)
+            // Prevent browser caching so regenerated PDFs are always requested
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            res.setHeader('Pragma', 'no-cache')
+            res.setHeader('Expires', '0')
             res.setHeader('Content-Type', 'image/jpeg')
             res.setHeader('Content-Disposition', `inline; filename="marksheet_${marksheet.studentDetails.regNumber}_${marksheet.marksheetId}.jpg"`)
             res.setHeader('Content-Length', jpegBuffer.length)
@@ -461,6 +478,10 @@ export default async function handler(req, res) {
         }
 
         // Set response headers for PDF
+        // Prevent browser caching so regenerated PDFs are always requested
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        res.setHeader('Pragma', 'no-cache')
+        res.setHeader('Expires', '0')
         res.setHeader('Content-Type', 'application/pdf')
         res.setHeader('Content-Disposition', `attachment; filename="marksheet_${marksheet.studentDetails.regNumber}_${marksheet.marksheetId}.pdf"`)
         res.setHeader('Content-Length', pdfBuffer.length)
@@ -492,15 +513,19 @@ export default async function handler(req, res) {
       }
 
       const staffData = marksheet.staffId
-      const staffSignature = staffData?.eSignature || null
-      const staffName = staffData?.name || 'Staff Name'
+      const staffSignature = (marksheet.staffSignature && marksheet.staffSignature.length > 0)
+        ? marksheet.staffSignature
+        : (staffData?.eSignature || null)
+      const staffName = marksheet.staffName || staffData?.name || 'Staff Name'
       const hodData = marksheet.hodId
-      const hodSignature = hodData?.eSignature || null
-      const hodName = hodData?.name || 'HOD Name'
+      const hodSignature = (marksheet.hodSignature && marksheet.hodSignature.length > 0)
+        ? marksheet.hodSignature
+        : (hodData?.eSignature || null)
+      const hodName = marksheet.hodName || hodData?.name || 'HOD Name'
       const principalSignature = process.env.PRINCIPAL_SIGNATURE_URL || null
 
       try {
-        const pdfBuffer = await generateMarksheetPDF(marksheet, staffSignature, hodSignature, principalSignature, staffName, hodName)
+        const pdfBuffer = await generateMarksheetPDF(marksheet, staffSignature, hodSignature, staffName, hodName)
 
         if (returnType === 'base64') {
           const base64Pdf = pdfBuffer.toString('base64')
@@ -531,5 +556,18 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('Generate PDF API error:', err)
     return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+}
+
+// Allow other modules to invalidate the in-memory PDF cache for a marksheet
+export const invalidatePdfCache = (marksheetId) => {
+  try {
+    const key = getCacheKey(marksheetId)
+    if (pdfCache.has(key)) {
+      pdfCache.delete(key)
+      console.log('[generate-pdf] Invalidated PDF cache for:', marksheetId)
+    }
+  } catch (e) {
+    console.warn('[generate-pdf] Failed to invalidate cache for:', marksheetId, e && e.message)
   }
 }

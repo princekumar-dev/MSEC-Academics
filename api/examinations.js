@@ -1,5 +1,5 @@
 import { connectToDatabase } from '../lib/mongo.js'
-import { User } from '../models.js'
+import { User, Marksheet, Student } from '../models.js'
 import mongoose from 'mongoose'
 
 // Examination Schema
@@ -123,6 +123,62 @@ export default async function handler(req, res) {
           status: exam.status,
           createdAt: exam.createdAt
         }))
+      })
+    }
+
+    if (req.method === 'DELETE') {
+      const { examinationId, staffId } = req.body || {}
+      if (!examinationId) {
+        return res.status(400).json({ success: false, error: 'examinationId is required' })
+      }
+
+      const exam = await Examination.findById(examinationId).lean()
+      if (!exam) {
+        return res.status(404).json({ success: false, error: 'Examination not found' })
+      }
+
+      // If staffId provided, ensure only the owner can delete
+      if (staffId && exam.staffId && exam.staffId.toString() !== staffId) {
+        return res.status(403).json({ success: false, error: 'Not authorized to delete this examination' })
+      }
+
+      // Build date range for the examination month/year
+      let startDate = null
+      let endDate = null
+      try {
+        const month = Number(exam.examinationMonth)
+        const year = Number(exam.examinationYear)
+        if (!isNaN(month) && !isNaN(year)) {
+          startDate = new Date(year, month - 1, 1)
+          endDate = new Date(year, month, 1) // next month
+        }
+      } catch (e) {}
+
+      // Delete marksheets matching examinationName + date range + department
+      const marksheetFilter = { examinationName: exam.examinationName, 'studentDetails.department': exam.department }
+      if (startDate && endDate) {
+        marksheetFilter.examinationDate = { $gte: startDate, $lt: endDate }
+      }
+
+      const marksheetDeleteResult = await Marksheet.deleteMany(marksheetFilter)
+
+      // Delete students that were created specifically for this examination (match examinationName/date/department)
+      const studentFilter = { examinationName: exam.examinationName, department: exam.department }
+      if (startDate && endDate) {
+        studentFilter.examinationDate = { $gte: startDate, $lt: endDate }
+      }
+      const studentDeleteResult = await Student.deleteMany(studentFilter)
+
+      // Finally remove the examination document
+      await Examination.findByIdAndDelete(examinationId)
+
+      return res.status(200).json({
+        success: true,
+        message: 'Examination and associated marksheets/students deleted',
+        deleted: {
+          marksheets: marksheetDeleteResult.deletedCount || 0,
+          students: studentDeleteResult.deletedCount || 0
+        }
       })
     }
 

@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 import { connectToDatabase } from '../lib/mongo.js'
 import { Marksheet, Student, User } from '../models.js'
+import { invalidatePdfCache } from './generate-pdf.js'
 import multer from 'multer'
 import webpush from 'web-push'
 import { getUserSubscriptions, storeNotification } from '../lib/notificationService.js'
@@ -247,6 +248,9 @@ export default async function handler(req, res) {
         marksheet.updatedAt = new Date()
         await marksheet.save()
 
+        // Invalidate cached PDF so downloads reflect the new staff signature
+        try { invalidatePdfCache(marksheet._id.toString()) } catch (e) {}
+
         // Notify HOD when all marksheets for the class are verified
         try {
           const staff = staffDoc || await User.findById(marksheet.staffId)
@@ -408,6 +412,8 @@ export default async function handler(req, res) {
         if (!marksheet) {
           return res.status(404).json({ success: false, error: 'Marksheet not found' })
         }
+        // Invalidate cached PDF so downloads reflect the new HOD signature/status
+        try { invalidatePdfCache(marksheet._id.toString()) } catch (e) {}
         // Notify staff about HOD response
         try {
           const staff = await User.findById(marksheet.staffId)
@@ -461,6 +467,7 @@ export default async function handler(req, res) {
 
     if (req.method === 'PUT') {
       const { marksheetId, studentDetails, subjects } = req.body
+      const { regenerateSignatures, recomputeResults } = req.body || {}
 
       if (!marksheetId) {
         return res.status(400).json({ success: false, error: 'marksheetId is required' })
@@ -484,6 +491,43 @@ export default async function handler(req, res) {
         update.status = 'draft'
       }
 
+      // If requested, refresh staff/hod signatures from current user profiles
+      if (regenerateSignatures) {
+        try {
+          const existing = await Marksheet.findById(marksheetId).lean()
+          if (existing) {
+            if (existing.staffId) {
+              try {
+                const staff = await User.findById(existing.staffId).select('eSignature').lean()
+                if (staff && staff.eSignature) update.staffSignature = staff.eSignature
+              } catch (e) {}
+            }
+            if (existing.hodId) {
+              try {
+                const hod = await User.findById(existing.hodId).select('eSignature').lean()
+                if (hod && hod.eSignature) update.hodSignature = hod.eSignature
+              } catch (e) {}
+            }
+          }
+        } catch (e) {
+          console.error('[Marksheets API] regenerateSignatures lookup failed:', e && e.message)
+        }
+      }
+
+      // If requested, recompute subject results/overallResult from stored subjects
+      if (recomputeResults) {
+        try {
+          const existing = await Marksheet.findById(marksheetId).lean()
+          if (existing && Array.isArray(existing.subjects)) {
+            const normalized = normalizeSubjectsWithResult(existing.subjects || [])
+            update.subjects = normalized
+            update.overallResult = getOverallResult(normalized)
+          }
+        } catch (e) {
+          console.error('[Marksheets API] recomputeResults failed:', e && e.message)
+        }
+      }
+
       const marksheet = await Marksheet.findByIdAndUpdate(
         marksheetId,
         update,
@@ -493,6 +537,9 @@ export default async function handler(req, res) {
       if (!marksheet) {
         return res.status(404).json({ success: false, error: 'Marksheet not found' })
       }
+
+      // If regenerate requested or signature fields changed, invalidate cached PDF
+      try { invalidatePdfCache(marksheet._id.toString()) } catch (e) {}
 
       return res.status(200).json({ success: true, marksheet })
     }
