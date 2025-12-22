@@ -261,7 +261,7 @@ server.js                          # Express server setup
   password: String (hashed),
   role: 'staff' | 'hod',
   name: String,
-  department: 'CSE' | 'AI_DS' | 'ECE' | 'MECH' | 'CIVIL' | 'EEE',
+   department: 'CSE' | 'AI_DS' | 'ECE' | 'MECH' | 'CIVIL' | 'EEE' | 'HNS',
   year: String, // Staff only
   section: String, // Staff only
   eSignature: String, // Base64 encoded

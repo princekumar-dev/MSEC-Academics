@@ -44,6 +44,14 @@ const academicUsers = [
     department: 'EEE',
     phoneNumber: '+91-9876543214'
   },
+  {
+    name: 'Dr. Latha Narayanan',
+    email: 'hod.hns@msec.edu.in',
+    password: 'hod123',
+    role: 'hod',
+    department: 'HNS',
+    phoneNumber: '+91-9876543230'
+  },
   
   // Staff members for CSE department
   {
@@ -143,6 +151,25 @@ const academicUsers = [
     department: 'EEE',
     class: 'B',
     phoneNumber: '+91-9876543224'
+  }
+  ,
+  {
+    name: 'Prof. Maya Krishnan',
+    email: 'maya.krishnan@msec.edu.in',
+    password: 'staff123',
+    role: 'staff',
+    department: 'HNS',
+    class: 'A',
+    phoneNumber: '+91-9876543231'
+  },
+  {
+    name: 'Prof. S. Ramesh',
+    email: 's.ramesh@msec.edu.in',
+    password: 'staff123',
+    role: 'staff',
+    department: 'HNS',
+    class: 'B',
+    phoneNumber: '+91-9876543232'
   }
 ]
 
