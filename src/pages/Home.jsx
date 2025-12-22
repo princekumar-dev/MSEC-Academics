@@ -1,22 +1,16 @@
 
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 function Home() {
   const [userData, setUserData] = useState(null)
   const [dashboardStats, setDashboardStats] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
-  const navigate = useNavigate()
 
   useEffect(() => {
-    // Check authentication and get user data
+    // Get user data from localStorage (auth check already done in App.jsx)
     const auth = localStorage.getItem('auth')
-    if (!auth) {
-      // Redirect to login if not authenticated
-      navigate('/login')
-      return
-    }
-
+    
     try {
       const authData = JSON.parse(auth)
       // If section is missing, fetch latest user data from backend
@@ -45,9 +39,8 @@ function Home() {
       }
     } catch (error) {
       console.error('Error parsing auth data:', error)
-      navigate('/login')
     }
-  }, [navigate])
+  }, [])
 
   const fetchDashboardData = async (user) => {
     try {

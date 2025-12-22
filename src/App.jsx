@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { Suspense, lazy, useEffect } from 'react'
 import { PageSkeleton } from './components/Skeleton'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -28,6 +28,12 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 // Suspense fallback
 const LoadingSpinner = () => (<PageSkeleton />)
 
+// Protected route wrapper
+const ProtectedHome = () => {
+  const auth = localStorage.getItem('auth')
+  return auth ? <Home /> : <Navigate to="/login" replace />
+}
+
 function AppContent() {
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
@@ -56,7 +62,7 @@ function AppContent() {
             <div className={`layout-content-container flex flex-col w-full max-w-full ${!isAuthPage ? 'pb-20 md:pb-0' : ''}`}>
               <Suspense fallback={<LoadingSpinner />}>
                     <Routes>
-                      <Route path="/" element={<Home />} />
+                      <Route path="/" element={<ProtectedHome />} />
                       {/* Staff Routes */}
                       <Route path="/import-marks" element={<ImportMarks />} />
                       <Route path="/marksheets" element={<Marksheets />} />
