@@ -19,6 +19,7 @@ function DispatchRequests() {
     return auth ? JSON.parse(auth) : null
   })
   const [marksheets, setMarksheets] = useState([])
+  const [dispatchedMarksheets, setDispatchedMarksheets] = useState([])
   const [loading, setLoading] = useState(true)
   const [batching, setBatching] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
@@ -30,6 +31,8 @@ function DispatchRequests() {
   const [feedback, setFeedback] = useState('')
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [viewTab, setViewTab] = useState('active') // 'active' or 'history'
+  const [currentExaminationId, setCurrentExaminationId] = useState(null) // Track current exam for filtering dispatch history
 
   useEffect(() => {
     if (userData?.role === 'staff') {
@@ -44,16 +47,52 @@ function DispatchRequests() {
     setLoading(true)
     try {
       const staffId = userData?._id || userData?.id || localStorage.getItem('userId')
-      const response = await fetch(`/api/marksheets?staffId=${staffId}&status=verified_by_staff,dispatch_requested,rescheduled_by_hod,approved_by_hod,rejected_by_hod,dispatched`)
+      // Fetch active (non-dispatched) marksheets only
+      const response = await fetch(`/api/marksheets?staffId=${staffId}&status=verified_by_staff,dispatch_requested,rescheduled_by_hod,approved_by_hod,rejected_by_hod`)
       const data = await response.json()
       if (data.success) {
         setMarksheets(data.marksheets)
       } else {
         setMarksheets([])
       }
+      
+      // Fetch already-dispatched marksheets separately for history view
+      let historyData = { success: false, marksheets: [] }
+      try {
+        const historyResponse = await fetch(`/api/marksheets?staffId=${staffId}&status=dispatched`)
+        historyData = await historyResponse.json()
+        if (historyData.success) {
+          setDispatchedMarksheets(historyData.marksheets)
+        } else {
+          setDispatchedMarksheets([])
+        }
+      } catch (historyErr) {
+        console.error('Error fetching dispatched marksheets:', historyErr)
+        setDispatchedMarksheets([])
+      }
+      
+      // Determine most recent exam ID from BOTH active and dispatched marksheets combined
+      const allMarksheets = [
+        ...(data.success ? data.marksheets : []),
+        ...(historyData?.success ? historyData.marksheets : [])
+      ]
+      
+      if (allMarksheets && allMarksheets.length > 0) {
+        const exams = allMarksheets.map(m => ({
+          id: m.examinationId,
+          name: m.examinationName,
+          createdAt: m.createdAt
+        }))
+        const uniqueExams = Array.from(new Map(exams.map(e => [e.id, e])).values())
+        const mostRecentExam = uniqueExams.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0]
+        setCurrentExaminationId(mostRecentExam?.id || null)
+      } else {
+        setCurrentExaminationId(null)
+      }
     } catch (err) {
       console.error('Error fetching marksheets:', err)
       setMarksheets([])
+      setCurrentExaminationId(null)
     } finally {
       setLoading(false)
     }
@@ -172,7 +211,9 @@ function DispatchRequests() {
         }
       }
       setFeedback('Marksheet dispatched to parent via WhatsApp.')
+      // Update both marksheets and dispatchedMarksheets to ensure it works from both views
       setMarksheets((prev) => prev.map((m) => m._id === marksheet._id ? { ...m, status: 'dispatched' } : m))
+      setDispatchedMarksheets((prev) => prev.map((m) => m._id === marksheet._id ? { ...m, status: 'dispatched' } : m))
       await fetchVerifiedMarksheets()
     } catch (err) {
       console.error(err)
@@ -236,24 +277,39 @@ function DispatchRequests() {
     }
   }
 
-  const statusFilters = useMemo(() => ([
-    { id: 'all', label: 'All', count: marksheets.length },
-    { id: 'verified_by_staff', label: 'Ready', count: marksheets.filter(m => m.status === 'verified_by_staff').length },
-    { id: 'dispatch_requested', label: 'Pending', count: marksheets.filter(m => m.status === 'dispatch_requested').length },
-    { id: 'rescheduled_by_hod', label: 'Rescheduled', count: marksheets.filter(m => m.status === 'rescheduled_by_hod').length },
-    { id: 'approved_by_hod', label: 'Approved', count: marksheets.filter(m => m.status === 'approved_by_hod').length },
-    { id: 'rejected_by_hod', label: 'Rejected', count: marksheets.filter(m => m.status === 'rejected_by_hod').length },
-    { id: 'dispatched', label: 'Dispatched', count: marksheets.filter(m => m.status === 'dispatched').length }
-  ]), [marksheets])
+  const statusFilters = useMemo(() => {
+    // Use the appropriate list based on current view tab
+    const source = viewTab === 'active' ? marksheets : dispatchedMarksheets
+    return [
+      { id: 'all', label: 'All', count: source.length },
+      { id: 'verified_by_staff', label: 'Ready', count: source.filter(m => m.status === 'verified_by_staff').length },
+      { id: 'dispatch_requested', label: 'Pending', count: source.filter(m => m.status === 'dispatch_requested').length },
+      { id: 'rescheduled_by_hod', label: 'Rescheduled', count: source.filter(m => m.status === 'rescheduled_by_hod').length },
+      { id: 'approved_by_hod', label: 'Approved', count: source.filter(m => m.status === 'approved_by_hod').length },
+      { id: 'rejected_by_hod', label: 'Rejected', count: source.filter(m => m.status === 'rejected_by_hod').length },
+      { id: 'dispatched', label: 'Dispatched', count: source.filter(m => m.status === 'dispatched').length }
+    ]
+  }, [marksheets, dispatchedMarksheets, viewTab])
 
   const filteredMarksheets = useMemo(() => {
-    const filtered = statusFilter === 'all' ? marksheets : marksheets.filter((m) => m.status === statusFilter)
+    // Choose which list to filter based on active tab
+    let source = viewTab === 'active' ? marksheets : dispatchedMarksheets
+    
+    // For history view, only show marksheets from the current (most recent) examination
+    if (viewTab === 'history' && currentExaminationId) {
+      source = source.filter(m => m.examinationId === currentExaminationId)
+    }
+    
+    const filtered = statusFilter === 'all' ? source : source.filter((m) => m.status === statusFilter)
     return filtered.sort((a, b) => {
       const regA = (a.studentDetails?.regNumber || '').toString().toLowerCase()
       const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
       return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
     })
-  }, [marksheets, statusFilter])
+  }, [marksheets, dispatchedMarksheets, statusFilter, viewTab, currentExaminationId])
+
+  // Count of marksheets that are approved by HOD
+  const approvedCount = useMemo(() => marksheets.filter(m => m.status === 'approved_by_hod').length, [marksheets])
 
   const statusStyles = {
     verified_by_staff: 'bg-blue-100 text-blue-800',
@@ -300,15 +356,7 @@ function DispatchRequests() {
             {loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading verified marksheets...</p>
-              </div>
-            ) : marksheets.length === 0 ? (
-              <div className="text-center py-12">
-                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No marksheets available</h3>
-                <p className="text-gray-600">Import and verify marksheets to begin requesting dispatch approvals.</p>
+                <p className="text-gray-600">Loading marksheets...</p>
               </div>
             ) : (
               <>
@@ -316,25 +364,60 @@ function DispatchRequests() {
                   <strong>Tip:</strong> Request dispatch after verifying marksheets. Once the HOD approves, you can send the report directly to parents via WhatsApp.
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 mb-6">
-                  {statusFilters.map((filter) => (
-                    <button
-                      key={filter.id}
-                      onClick={() => setStatusFilter(filter.id)}
-                      className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors duration-200 whitespace-nowrap ${
-                        statusFilter === filter.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-yellow-400'
-                      }`}
-                    >
-                      {filter.label}
-                      <span className={`ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-semibold ${statusFilter === filter.id ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700'}`}>
-                        {filter.count}
-                      </span>
-                    </button>
-                  ))}
+                {/* View Tabs: Active vs Dispatched History */}
+                <div className="flex items-center gap-2 mb-6 border-b border-gray-200">
+                  <button
+                    onClick={() => { setViewTab('active'); setStatusFilter('all') }}
+                    className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${viewTab === 'active' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+                  >
+                    Active ({marksheets.length})
+                  </button>
+                  <button
+                    onClick={() => { setViewTab('history'); setStatusFilter('all') }}
+                    className={`px-4 py-3 font-semibold text-sm border-b-2 transition-colors ${viewTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-600 hover:text-gray-900'}`}
+                  >
+                    Dispatched History ({dispatchedMarksheets.length})
+                  </button>
                 </div>
 
+                {/* Empty state for current tab */}
+                {((viewTab === 'active' && marksheets.length === 0) || (viewTab === 'history' && dispatchedMarksheets.length === 0)) ? (
+                  <div className="text-center py-12">
+                    <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No marksheets available</h3>
+                    <p className="text-gray-600">{viewTab === 'active' ? 'Import and verify marksheets to begin requesting dispatch approvals.' : 'No dispatched marksheets yet.'}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-6">
+                      {/* Show filters and refresh only in Active tab */}
+                      {viewTab === 'active' && (
+                        <>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {statusFilters.map((filter) => (
+                          <button
+                            key={filter.id}
+                            onClick={() => setStatusFilter(filter.id)}
+                            className={`px-3 py-2 rounded-full text-xs sm:text-sm font-medium border transition-colors duration-200 whitespace-nowrap ${
+                              statusFilter === filter.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:border-yellow-400'
+                            }`}
+                          >
+                            {filter.label}
+                            <span className={`ml-1 inline-flex items-center justify-center px-1.5 py-0.5 rounded-full text-xs font-semibold ${statusFilter === filter.id ? 'bg-white/25 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                              {filter.count}
+                            </span>
+                          </button>
+                        ))}
+                          </div>
+                          <RefreshButton isLoading={refreshing} onClick={handleRefresh} />
+                        </>
+                      )}
+                    </div>
+
                 {(feedback || error) && (
-                  <div className="mb-6 space-y-2">
+                  <div className="mt-0 mb-3 space-y-2">
                     {feedback && (
                       <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
                         {feedback}
@@ -348,48 +431,51 @@ function DispatchRequests() {
                   </div>
                 )}
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
-                  <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-                    <button
-                      onClick={requestDispatchAll}
-                      disabled={batching || marksheets.every((m) => m.status !== 'verified_by_staff')}
-                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${
-                        batching || marksheets.every((m) => m.status !== 'verified_by_staff')
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors'
-                      }`}
-                    >
-                      {batching ? 'Requesting...' : '📋 Request All'}
-                    </button>
-                    
-                    <button
-                      onClick={sendAllApproved}
-                      disabled={sendingAll || marksheets.every((m) => m.status !== 'approved_by_hod')}
-                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${
-                        sendingAll || marksheets.every((m) => m.status !== 'approved_by_hod')
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : 'bg-green-600 text-white hover:bg-green-700 transition-colors'
-                      }`}
-                    >
-                      {sendingAll ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Sending...
-                        </>
-                      ) : (
-                        <>
-                          📤 Send All
-                        </>
-                      )}
-                    </button>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-3">
+                  {/* Show action buttons only when viewing Active tab */}
+                  {viewTab === 'active' && (
+                    <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                      <button
+                        onClick={requestDispatchAll}
+                        disabled={batching || marksheets.every((m) => m.status !== 'verified_by_staff')}
+                        className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${
+                          batching || marksheets.every((m) => m.status !== 'verified_by_staff')
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors'
+                        }`}
+                      >
+                        {batching ? 'Requesting...' : '📋 Request All'}
+                      </button>
+                      
+                      <button
+                        onClick={sendAllApproved}
+                        disabled={sendingAll || marksheets.every((m) => m.status !== 'approved_by_hod')}
+                        className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${
+                          sendingAll || marksheets.every((m) => m.status !== 'approved_by_hod')
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-green-600 text-white hover:bg-green-700 transition-colors'
+                        }`}
+                      >
+                        {sendingAll ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            📤 Send All
+                          </>
+                        )}
+                      </button>
 
-                    <button
-                      onClick={async () => {
-                        // Download all marksheets currently visible in a ZIP
-                        const candidates = marksheets.filter(m => m.status === 'approved_by_hod' || m.status === 'dispatched' || m.status === 'verified_by_staff' || m.status === 'dispatch_requested' || m.status === 'rescheduled_by_hod')
-                        if (!candidates || candidates.length === 0) return
-                        setFeedback('')
-                        setError('')
+                      <button
+                        onClick={async () => {
+                          // Download all marksheets currently visible in a ZIP
+                          // Only include marksheets that have been approved by HOD
+                          const candidates = marksheets.filter(m => m.status === 'approved_by_hod')
+                          if (!candidates || candidates.length === 0) return
+                          setFeedback('')
+                          setError('')
                         setDownloadingAll(true)
                         try {
                           const zip = new JSZip()
@@ -449,8 +535,10 @@ function DispatchRequests() {
                           setDownloadingAll(false)
                         }
                       }}
-                      disabled={downloadingAll || marksheets.length === 0}
-                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${downloadingAll || marksheets.length === 0 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 transition-colors'}`}
+                      disabled={downloadingAll || approvedCount === 0}
+                      aria-disabled={downloadingAll || approvedCount === 0}
+                      title={downloadingAll ? 'Preparing ZIP...' : (approvedCount === 0 ? 'Disabled until HOD approval (no approved marksheets).' : 'Download all approved marksheets as ZIP')}
+                      className={`inline-flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-semibold whitespace-nowrap ${(downloadingAll || approvedCount === 0) ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700 transition-colors'}`}
                     >
                       {downloadingAll ? 'Preparing ZIP...' : '📥 Download All (ZIP)'}
                     </button>
@@ -497,11 +585,8 @@ function DispatchRequests() {
                     >
                       {regenerating ? 'Regenerating...' : '🔁 Regenerate All'}
                     </button>
-                  </div>
-                  
-                  <div className="self-end sm:self-auto">
-                    <RefreshButton isLoading={refreshing} onClick={handleRefresh} />
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -572,12 +657,27 @@ function DispatchRequests() {
 
                             {marksheet.status === 'approved_by_hod' && (
                               <button
-                                onClick={(e) => {
+                                onClick={async (e) => {
                                   e.preventDefault()
                                   const ts = Date.now()
                                   const origin = getPublicOrigin()
                                   const url = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}` : `/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}`
                                   window.open(url, '_blank')
+                                  
+                                  // Mark as dispatched when downloaded
+                                  try {
+                                    await fetch('/api/marksheets', {
+                                      method: 'PUT',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ marksheetId: marksheet._id, status: 'dispatched' })
+                                    })
+                                    // Update local state
+                                    setMarksheets((prev) => prev.map((m) => 
+                                      m._id === marksheet._id ? { ...m, status: 'dispatched' } : m
+                                    ))
+                                  } catch (err) {
+                                    console.error('Error marking marksheet as dispatched:', err)
+                                  }
                                 }}
                                 className="mt-2 block w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-yellow-600 border border-yellow-300 bg-white hover:bg-yellow-50 hover:border-yellow-400 text-center text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
                               >
@@ -595,14 +695,23 @@ function DispatchRequests() {
                             )}
 
                             {marksheet.status === 'dispatched' && (
-                              <a
-                                href={`/api/generate-pdf?marksheetId=${marksheet._id}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="block w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-yellow-600 border border-yellow-300 bg-white hover:bg-yellow-50 hover:border-yellow-400 text-center text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
-                              >
-                                Download PDF
-                              </a>
+                              <>
+                                <button
+                                  onClick={() => sendDispatch(marksheet)}
+                                  disabled={dispatchingId === marksheet._id}
+                                  className={`w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-white text-xs sm:text-sm transition-colors duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-offset-1 ${dispatchingId === marksheet._id ? 'bg-green-300 cursor-wait' : 'bg-green-600 hover:bg-green-700 focus:ring-green-500'}`}
+                                >
+                                  {dispatchingId === marksheet._id ? 'Sending…' : '📤 Re-send'}
+                                </button>
+                                <a
+                                  href={`/api/generate-pdf?marksheetId=${marksheet._id}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 block w-full md:px-6 px-3 sm:px-4 py-2 rounded-lg font-medium text-yellow-600 border border-yellow-300 bg-white hover:bg-yellow-50 hover:border-yellow-400 text-center text-xs sm:text-sm transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
+                                >
+                                  Download PDF
+                                </a>
+                              </>
                             )}
                           </div>
                         </div>
@@ -617,6 +726,8 @@ function DispatchRequests() {
                     </div>
                   ))}
                 </div>
+                  </>
+                )}
               </>
             )}
           </div>

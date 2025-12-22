@@ -245,11 +245,16 @@ function Header() {
     }
   }
   
-  const handleResultClick = (link) => {
-    navigate(link)
+  const handleResultClick = (e, link) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setShowSearchDropdown(false)
     setSearchQuery('')
     setSearchResults([])
-    setShowSearchDropdown(false)
+    // Use setTimeout to ensure state updates before navigation
+    setTimeout(() => {
+      navigate(link)
+    }, 0)
   }
 
   return (
@@ -331,7 +336,7 @@ function Header() {
               value={searchQuery}
               onChange={(e) => handleSearchInput(e.target.value)}
               onFocus={() => searchResults.length > 0 && setShowSearchDropdown(true)}
-              onBlur={() => setTimeout(() => setShowSearchDropdown(false), 200)}
+              onBlur={() => setTimeout(() => setShowSearchDropdown(false), 300)}
               placeholder="Search students, exams..."
               className="form-input w-full h-full text-[#111418] focus:outline-0 focus:ring-0 border border-white/10 bg-white/30 backdrop-blur-sm placeholder:text-[#60758a] pl-9 lg:pl-10 pr-3 text-xs lg:text-sm font-normal leading-normal rounded-lg lg:rounded-xl relative z-0"
               onKeyPress={(e) => {
@@ -351,7 +356,8 @@ function Header() {
                     {searchResults.map((result, idx) => (
                       <button
                         key={idx}
-                        onClick={() => handleResultClick(result.link)}
+                        onClick={(e) => handleResultClick(e, result.link)}
+                        onMouseDown={(e) => e.preventDefault()}
                         className="w-full px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-100 last:border-b-0 transition-colors"
                       >
                         <div className="flex items-start gap-3">
@@ -384,11 +390,16 @@ function Header() {
                     ))}
                     {searchQuery && (
                       <button
-                        onClick={() => {
-                          navigate(`/records?search=${encodeURIComponent(searchQuery.trim())}`)
-                          setSearchQuery('')
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
                           setShowSearchDropdown(false)
+                          setSearchQuery('')
+                          setTimeout(() => {
+                            navigate(`/records?search=${encodeURIComponent(searchQuery.trim())}`)
+                          }, 0)
                         }}
+                        onMouseDown={(e) => e.preventDefault()}
                         className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 text-left text-sm text-blue-600 font-medium transition-colors"
                       >
                         View all results for "{searchQuery}"

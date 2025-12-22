@@ -1,8 +1,9 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
 import { Suspense, lazy, useEffect } from 'react'
 import { PageSkeleton } from './components/Skeleton'
 import ErrorBoundary from './components/ErrorBoundary'
 import Header from './components/Header'
+import BottomNav from './components/BottomNav'
 import { AlertProvider } from './components/AlertContext'
 // Removed old notification imports for academic system
 
@@ -27,18 +28,33 @@ const NotFound = lazy(() => import('./pages/NotFound'))
 // Suspense fallback
 const LoadingSpinner = () => (<PageSkeleton />)
 
-function App() {
-  // Academic system doesn't need push notifications
+function AppContent() {
+  const location = useLocation()
+  const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
+  
   return (
-    <ErrorBoundary>
-      <AlertProvider>
-        <Router>
-          <div className="relative flex w-full min-h-screen flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 overflow-x-hidden smooth-scroll" style={{ fontFamily: 'Inter, Manrope, sans-serif' }}>
-            <div className="layout-container flex h-full grow flex-col max-w-full">
-              <Header />
-              <div className="flex flex-1 justify-center w-full">
-                <div className="layout-content-container flex flex-col w-full max-w-full">
-                  <Suspense fallback={<LoadingSpinner />}>
+    <>
+      <div 
+        className="flex w-full min-h-screen flex-col overflow-x-hidden smooth-scroll" 
+        style={{ 
+          fontFamily: 'Inter, Manrope, sans-serif',
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'none',
+          transform: 'translateZ(0)', // Force GPU acceleration
+          ...(isAuthPage ? {
+            backgroundImage: 'url(/images/campus.jpeg)',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundAttachment: 'fixed'
+          } : {})
+        }}
+      >
+        {isAuthPage && <div className="absolute inset-0 bg-black/40 z-0"></div>}
+        <div className={`layout-container flex h-full grow flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}`}>
+          <Header />
+          <div className="flex flex-1 justify-center w-full">
+            <div className={`layout-content-container flex flex-col w-full max-w-full ${!isAuthPage ? 'pb-20 md:pb-0' : ''}`}>
+              <Suspense fallback={<LoadingSpinner />}>
                     <Routes>
                       <Route path="/" element={<Home />} />
                       {/* Staff Routes */}
@@ -67,6 +83,17 @@ function App() {
               </div>
             </div>
           </div>
+      <BottomNav />
+    </>
+  )
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AlertProvider>
+        <Router>
+          <AppContent />
         </Router>
       </AlertProvider>
     </ErrorBoundary>

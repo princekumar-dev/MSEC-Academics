@@ -3,12 +3,14 @@ import * as XLSX from 'xlsx'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import ConfirmDialog from '../components/ConfirmDialog'
+import SwipeableCard from '../components/SwipeableCard'
 import { TableSkeleton } from '../components/SkeletonLoaders'
 import { NoMarksheets, NoSearchResults } from '../components/EmptyStates'
 import { useUndoToast } from '../components/UndoToast'
 import { useConfetti } from '../components/Confetti'
 import { HelpTooltip } from '../components/ContextualHelp'
 import { deriveOverallResult } from '../utils/resultUtils'
+import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
 
 function Marksheets() {
   const navigate = useNavigate()
@@ -40,6 +42,17 @@ function Marksheets() {
   const [groupedMarksheets, setGroupedMarksheets] = useState({})
   const [createdExamination, setCreatedExamination] = useState(null)
   const [examinations, setExaminations] = useState([])
+
+  // Pull-to-refresh functionality
+  const handleRefresh = async () => {
+    await Promise.all([fetchMarksheets(), fetchExaminations()])
+    showInfo('🔄 Refreshed', 'Marksheets data updated')
+  }
+
+  const { isPulling, isRefreshing, pullDistance, containerRef, threshold } = usePullToRefresh(handleRefresh, {
+    enabled: true,
+    threshold: 80
+  })
 
   const statusStyles = {
     verified_by_staff: 'bg-blue-100 text-blue-800',
@@ -498,7 +511,12 @@ function Marksheets() {
   const dispatchedCount = marksheets.filter(m => m.status === 'dispatched').length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 no-mobile-anim">
+    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 no-mobile-anim">
+      <PullToRefreshIndicator 
+        pullDistance={pullDistance} 
+        threshold={threshold} 
+        isRefreshing={isRefreshing} 
+      />
       <div className="responsive-container py-6 md:py-8">
         <div className="max-w-7xl mx-auto">
           {/* Header Section */}
@@ -842,44 +860,67 @@ function Marksheets() {
                     </button>
                   </div>
                 </div>
-                {groupedMarksheets[selectedExamination]?.map((marksheet) => (
-                  <div key={marksheet._id} className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300">
-                    {/* Header with name and status icon */}
-                    <div className="flex items-start justify-between mb-4">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words flex-1 pr-4">
-                        {marksheet.studentDetails?.name || 'Unknown student'}
-                      </h3>
-                      <span className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-semibold uppercase tracking-wide flex items-center gap-0.5 sm:gap-1 flex-shrink-0 whitespace-nowrap ${statusStyles[marksheet.status] || 'bg-gray-100 text-gray-700'}`}>
-                        <span className="text-xs sm:text-sm">{statusIcons[marksheet.status] || '📄'}</span>
-                        <span className="text-xs">{(marksheet.status || 'unknown').replace(/_/g, ' ')}</span>
-                      </span>
-                    </div>
-                    
-                    {/* Details with spacing */}
-                    <div className="space-y-3 mb-4">
-                      <p className="text-gray-600 text-xs sm:text-sm">
-                        {marksheet.studentDetails?.regNumber || '—'} • Class {(() => {
-                          const year = (marksheet.studentDetails?.year || '').toString()
-                          const section = (marksheet.studentDetails?.section || '').toString()
-                          if (year && section) return `${year}-${section}`
-                          if (year) return year
-                          if (section) return section
-                          return '—'
-                        })()}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        Overall Result: <span className="font-semibold text-gray-900">{deriveOverallResult(marksheet)}</span>
-                      </p>
-                    </div>
+                {groupedMarksheets[selectedExamination]?.map((marksheet) => {
+                  const swipeActions = [
+                    {
+                      label: 'View',
+                      icon: '👁️',
+                      onClick: () => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`),
+                      className: 'bg-blue-500 hover:bg-blue-600'
+                    }
+                  ]
 
-                    {/* View Details button */}
-                    <div>
-                      <button onClick={() => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`)} className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium">
-                        View Details
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  // Add Verify action if not verified
+                  if (marksheet.status !== 'verified_by_staff' && marksheet.status !== 'dispatch_requested') {
+                    swipeActions.push({
+                      label: 'Verify',
+                      icon: '✅',
+                      onClick: () => verifyMarksheet(marksheet._id),
+                      className: 'bg-green-500 hover:bg-green-600'
+                    })
+                  }
+
+                  return (
+                    <SwipeableCard key={marksheet._id} actions={swipeActions}>
+                      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300">
+                        {/* Header with name and status icon */}
+                        <div className="flex items-start justify-between mb-4">
+                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words flex-1 pr-4">
+                            {marksheet.studentDetails?.name || 'Unknown student'}
+                          </h3>
+                          <span className={`px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-semibold uppercase tracking-wide flex items-center gap-0.5 sm:gap-1 flex-shrink-0 whitespace-nowrap ${statusStyles[marksheet.status] || 'bg-gray-100 text-gray-700'}`}>
+                            <span className="text-xs sm:text-sm">{statusIcons[marksheet.status] || '📄'}</span>
+                            <span className="text-xs">{(marksheet.status || 'unknown').replace(/_/g, ' ')}</span>
+                          </span>
+                        </div>
+                        
+                        {/* Details with spacing */}
+                        <div className="space-y-3 mb-4">
+                          <p className="text-gray-600 text-xs sm:text-sm">
+                            {marksheet.studentDetails?.regNumber || '—'} • Class {(() => {
+                              const year = (marksheet.studentDetails?.year || '').toString()
+                              const section = (marksheet.studentDetails?.section || '').toString()
+                              if (year && section) return `${year}-${section}`
+                              if (year) return year
+                              if (section) return section
+                              return '—'
+                            })()}
+                          </p>
+                          <p className="text-xs sm:text-sm text-gray-500">
+                            Overall Result: <span className="font-semibold text-gray-900">{deriveOverallResult(marksheet)}</span>
+                          </p>
+                        </div>
+
+                        {/* View Details button */}
+                        <div>
+                          <button onClick={() => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`)} className="text-blue-600 hover:text-blue-800 text-xs sm:text-sm font-medium">
+                            View Details
+                          </button>
+                        </div>
+                      </div>
+                    </SwipeableCard>
+                  )
+                })}
               </div>
             ) : (
               // Show grouped examinations

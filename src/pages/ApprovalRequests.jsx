@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import RefreshButton from '../components/RefreshButton'
+import SwipeableCard from '../components/SwipeableCard'
 import { useAlert } from '../components/AlertContext'
 import { CardSkeleton, ListSkeleton } from '../components/SkeletonLoaders'
 import { NoPendingRequests } from '../components/EmptyStates'
 import { useConfetti } from '../components/Confetti'
 import { HelpTooltip } from '../components/ContextualHelp'
+import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
 
 function ApprovalRequests() {
   const { showSuccess, showError, showWarning } = useAlert()
@@ -30,7 +32,41 @@ function ApprovalRequests() {
   const [bulkRescheduleOpen, setBulkRescheduleOpen] = useState(false)
   const [bulkRescheduleLoading, setBulkRescheduleLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  // Map department codes to friendly names (used for badges)
+  const departmentDisplay = {
+    'AI_DS': 'AI & DS',
+    'CSE': 'CSE',
+    'IT': 'IT',
+    'ECE': 'ECE',
+    'EEE': 'EEE',
+    'MECH': 'MECH',
+    'CIVIL': 'CIVIL',
+    'HNS': 'H&S'
+  }
+
+  // Department color classes for badges (Tailwind)
+  const departmentColors = {
+    'CSE': 'bg-blue-100 text-blue-800',
+    'AI_DS': 'bg-indigo-100 text-indigo-800',
+    'ECE': 'bg-teal-100 text-teal-800',
+    'IT': 'bg-green-100 text-green-800',
+    'MECH': 'bg-amber-100 text-amber-800',
+    'CIVIL': 'bg-red-100 text-red-800',
+    'EEE': 'bg-purple-100 text-purple-800',
+    'HNS': 'bg-yellow-50 text-yellow-800'
+  }
   const navigate = useNavigate()
+
+  // Pull-to-refresh functionality
+  const handlePullRefresh = async () => {
+    await fetchPendingRequests()
+    showSuccess('🔄 Refreshed', 'Approval requests updated')
+  }
+
+  const { isPulling, isRefreshing, pullDistance, containerRef, threshold } = usePullToRefresh(handlePullRefresh, {
+    enabled: true,
+    threshold: 80
+  })
 
   useEffect(() => {
     if (userData?.role === 'hod') {
@@ -44,8 +80,14 @@ function ApprovalRequests() {
     if (!userData) return
     setLoading(true)
     try {
-      console.log('[ApprovalRequests] Fetching with department:', userData.department)
-      const response = await fetch(`/api/marksheets?department=${userData.department}&status=dispatch_requested,rescheduled_by_hod`)
+      // If logged-in HOD is HNS, they should see first-year requests across all departments
+      if (userData.department === 'HNS') {
+        console.log('[ApprovalRequests] HNS HOD detected — fetching Year I pending requests across departments')
+        var response = await fetch(`/api/marksheets?year=I&status=dispatch_requested,rescheduled_by_hod`)
+      } else {
+        console.log('[ApprovalRequests] Fetching with department:', userData.department)
+        var response = await fetch(`/api/marksheets?department=${userData.department}&status=dispatch_requested,rescheduled_by_hod`)
+      }
       const data = await response.json()
       console.log('[ApprovalRequests] Response:', data)
       if (data.success) {
@@ -272,7 +314,12 @@ function ApprovalRequests() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div ref={containerRef} className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <PullToRefreshIndicator 
+        pullDistance={pullDistance} 
+        threshold={threshold} 
+        isRefreshing={isRefreshing} 
+      />
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
@@ -398,7 +445,14 @@ function ApprovalRequests() {
                         <div className="flex items-start justify-between mb-3 gap-2">
                           <div className="flex-1 min-w-0">
                             <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 truncate">{marksheet.studentDetails?.name}</h3>
-                            <p className="text-xs sm:text-sm text-gray-600">{marksheet.studentDetails?.regNumber} • {formatClass(marksheet.studentDetails)}</p>
+                            <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                              <span>{marksheet.studentDetails?.regNumber} • {formatClass(marksheet.studentDetails)}</span>
+                              {marksheet.studentDetails?.department && (
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${departmentColors[marksheet.studentDetails.department] || 'bg-gray-100 text-gray-800'}`}>
+                                  {departmentDisplay[marksheet.studentDetails?.department] || (marksheet.studentDetails?.department || '').toUpperCase()}
+                                </span>
+                              )}
+                            </p>
                           </div>
                           <span className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide flex items-center gap-1 whitespace-nowrap ${statusStyles[marksheet.status] || 'bg-yellow-100 text-yellow-800'}`}>
                             <span className="text-xs sm:text-sm">{statusIcons[marksheet.status] || '📄'}</span>

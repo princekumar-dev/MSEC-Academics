@@ -87,7 +87,12 @@ function Home() {
           setDashboardStats(stats);
         }
       } else if (user.role === 'hod') {
-        response = await fetch(`/api/marksheets?hodId=${user.id}`);
+        // For HNS HOD, show Year I marksheets across all departments so dashboard reflects first-year activity
+        if (user.department === 'HNS') {
+          response = await fetch(`/api/marksheets?year=I`);
+        } else {
+          response = await fetch(`/api/marksheets?hodId=${user.id}`);
+        }
         if (!response.ok) {
           throw new Error('Server error: ' + response.status);
         }

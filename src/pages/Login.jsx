@@ -29,7 +29,8 @@ function Login() {
 
     // Basic validation
     if (!formData.email || !formData.password) {
-      setError('Please fill in all fields')
+      const missing = !formData.email ? 'email address' : 'password'
+      setError(`📝 Please enter your ${missing} to continue.`)
       setIsLoading(false)
       return
     }
@@ -37,7 +38,7 @@ function Login() {
     // Validate email domain
     const emailDomain = formData.email.toLowerCase().split('@')[1]
     if (emailDomain !== 'msec.edu.in') {
-      setError('Please use a valid MSEC email address (@msec.edu.in)')
+      setError('🏫 Only MSEC institutional emails are allowed. Use your @msec.edu.in email address.')
       setIsLoading(false)
       return
     }
@@ -84,12 +85,20 @@ function Login() {
           window.dispatchEvent(new Event('authStateChanged'))
         }, 1000)
       } else {
-        setError(data.error || 'Invalid email or password')
-        showError('Login Failed', data.error || 'Invalid email or password')
+        const errorMsg = data.error || '🔐 Invalid credentials. Please check your email and password, then try again.'
+        setError(errorMsg)
+        showError('Login Failed', errorMsg + ' Need help? Contact support@msec.edu.in')
       }
     } catch (error) {
       console.error('Login error:', error)
-      const errorMsg = 'An error occurred during login. Please try again.'
+      let errorMsg
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        errorMsg = '🌐 Connection failed. Check your internet connection and try again.'
+      } else if (error.message?.includes('timeout')) {
+        errorMsg = '⏱️ Request timed out. The server is slow to respond. Please try again.'
+      } else {
+        errorMsg = '❌ Login failed: ' + (error.message || 'Unknown error. Please try again or contact support.')
+      }
       setError(errorMsg)
       showError('Error', errorMsg)
     } finally {
@@ -98,7 +107,7 @@ function Login() {
   }
 
   return (
-    <>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim">
       <style>
         {`
           @keyframes waveButtonAnimation {
@@ -123,31 +132,32 @@ function Login() {
         `}
       </style>
       
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="w-full max-w-md">
-          <div className="glass-card no-mobile-backdrop p-8 rounded-3xl shadow-2xl">
+      <div className="relative z-10">
+        
+        <div className="w-full max-w-md relative z-10">
+          <div className="backdrop-blur-md bg-white/20 border border-white/30 p-8 rounded-3xl shadow-2xl">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-2">Welcome Back</h1>
-              <p className="text-gray-600 text-lg">Sign in to your MSEC Academics account</p>
+              <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">Welcome Back</h1>
+              <p className="text-gray-100 text-lg">Sign in to your MSEC Academics account</p>
             </div>
               
             {/* Error Message */}
             {error && (
               <div className="mb-6">
-                <div className="glass-card no-mobile-backdrop p-4 border-l-4 border-red-500 bg-red-50">
-                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                <div className="backdrop-blur-sm bg-red-500/20 border border-red-400/50 p-4 border-l-4 rounded-lg">
+                  <p className="text-red-100 text-sm font-medium">{error}</p>
                 </div>
               </div>
             )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">
+                <label className="block text-sm font-bold text-white mb-3">
                   Email Address
                 </label>
                 <input
@@ -157,14 +167,14 @@ function Login() {
                   onChange={handleInputChange}
                   pattern=".*@msec\.edu\.in$"
                   title="Please use your MSEC email address (@msec.edu.in)"
-                  className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500"
+                  className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200"
                   placeholder="Enter your MSEC email address"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">
+                <label className="block text-sm font-bold text-white mb-3">
                   Password
                 </label>
                 <input
@@ -172,14 +182,14 @@ function Login() {
                   name="password"
                   value={formData.password}
                   onChange={handleInputChange}
-                  className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500"
+                  className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200"
                   placeholder="Enter your password"
                   required
                 />
               </div>
 
               <div className="text-center">
-                <p className="text-gray-600 text-sm cursor-pointer hover:text-blue-600 transition-colors">
+                <p className="text-gray-100 text-sm cursor-pointer hover:text-blue-200 transition-colors">
                   Forgot password?
                 </p>
               </div>
@@ -198,7 +208,7 @@ function Login() {
             </form>
             
             <div className="mt-8 text-center">
-              <p className="text-gray-600 text-sm">
+              <p className="text-gray-100 text-sm">
                 Don't have an account? 
                 <span className="text-blue-600 font-semibold cursor-pointer hover:underline ml-1" onClick={() => navigate('/signup')}>
                   Sign up
@@ -208,7 +218,7 @@ function Login() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

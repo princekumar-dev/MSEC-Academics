@@ -44,7 +44,14 @@ function SignUp() {
 
     // Basic validation
     if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.role || !formData.department) {
-      setError('Please fill in all required fields')
+      const missingFields = []
+      if (!formData.name) missingFields.push('Full Name')
+      if (!formData.email) missingFields.push('Email')
+      if (!formData.password) missingFields.push('Password')
+      if (!formData.confirmPassword) missingFields.push('Confirm Password')
+      if (!formData.role) missingFields.push('Role')
+      if (!formData.department) missingFields.push('Department')
+      setError(`Missing required fields: ${missingFields.join(', ')}. Please fill in all fields to continue.`)
       setIsLoading(false)
       return
     }
@@ -52,18 +59,23 @@ function SignUp() {
     // Validate email domain
     const emailDomain = formData.email.toLowerCase().split('@')[1]
     if (emailDomain !== 'msec.edu.in') {
-      setError('Please use a valid MSEC email address (@msec.edu.in)')
+      setError('❌ Invalid email domain. Only MSEC institutional emails are allowed. Example: john.doe@msec.edu.in')
       setIsLoading(false)
       return
     }
     
     if (formData.role === 'staff' && (!formData.year || !formData.section)) {
-      setError('Please select year and section for staff role')
+      setError('📋 Staff members must specify: ' + (!formData.year ? 'Academic Year (I-IV)' : '') + (!formData.year && !formData.section ? ' and ' : '') + (!formData.section ? 'Section (A/B)' : ''))
       setIsLoading(false)
       return
     }
     if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match')
+      setError('🔒 Password mismatch. The passwords you entered don\'t match. Please verify and try again.')
+      setIsLoading(false)
+      return
+    }
+    if (formData.password.length < 6) {
+      setError('🔒 Password too weak. Please use at least 6 characters for security.')
       setIsLoading(false)
       return
     }
@@ -92,7 +104,15 @@ function SignUp() {
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        setError(data.error || 'Failed to create account')
+        if (response.status === 409) {
+          setError('📧 This email is already registered. Try logging in instead, or use a different email.')
+        } else if (response.status === 400) {
+          setError(data.error || '❌ Invalid information provided. Please check all fields and try again.')
+        } else if (response.status >= 500) {
+          setError('🔧 Server error. Our team has been notified. Please try again in a few minutes.')
+        } else {
+          setError(data.error || '❌ Failed to create account. Please check your information and try again.')
+        }
         return
       }
 
@@ -101,14 +121,20 @@ function SignUp() {
       setTimeout(() => navigate('/login'), 900)
     } catch (err) {
       console.error('Sign up error:', err)
-      setError('An error occurred while creating account. Please try again.')
+      if (err.message.includes('fetch')) {
+        setError('🌐 Network error. Please check your internet connection and try again.')
+      } else if (err.message.includes('timeout')) {
+        setError('⏱️ Request timed out. The server is taking too long to respond. Please try again.')
+      } else {
+        setError('❌ Unable to create account. ' + (err.message || 'Please verify all information and try again.'))
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <>
+    <div className="min-h-screen flex items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim">
       <style>{`
         @keyframes waveButtonAnimation {
           0%, 100% { background-position: 0% 50%; }
@@ -123,43 +149,43 @@ function SignUp() {
         .login-wave-button:hover { animation-duration: 1.5s; }
       `}</style>
 
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim" style={{fontFamily: 'Inter, sans-serif'}}>
+      <div className="relative z-10">
         <div className="w-full max-w-md">
-          <div className="glass-card no-mobile-backdrop p-8 rounded-3xl shadow-2xl">
+          <div className="backdrop-blur-md bg-white/20 border border-white/30 p-8 rounded-3xl shadow-2xl">
             <div className="text-center mb-8">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-6">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
-              <h1 className="text-3xl sm:text-4xl font-black text-gray-900 mb-2">Create Account</h1>
-              <p className="text-gray-600 text-lg">Sign up for your MSEC Academics account</p>
+              <h1 className="text-3xl sm:text-4xl font-black text-white mb-2">Create Account</h1>
+              <p className="text-gray-100 text-lg">Sign up for your MSEC Academics account</p>
             </div>
 
             {error && (
               <div className="mb-6">
-                <div className="glass-card no-mobile-backdrop p-4 border-l-4 border-red-500 bg-red-50">
-                  <p className="text-red-700 text-sm font-medium">{error}</p>
+                <div className="backdrop-blur-sm bg-red-500/20 border border-red-400/50 p-4 border-l-4 rounded-lg">
+                  <p className="text-red-100 text-sm font-medium">{error}</p>
                 </div>
               </div>
             )}
 
             {success && (
               <div className="mb-6">
-                <div className="glass-card no-mobile-backdrop p-4 border-l-4 border-green-500 bg-green-50">
-                  <p className="text-green-700 text-sm font-medium">{success}</p>
+                <div className="backdrop-blur-sm bg-green-500/20 border border-green-400/50 p-4 border-l-4 rounded-lg">
+                  <p className="text-green-100 text-sm font-medium">{success}</p>
                 </div>
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Full Name</label>
-                <input name="name" value={formData.name} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500" placeholder="Dr. John Doe" required />
+                <label className="block text-sm font-bold text-white mb-3">Full Name</label>
+                <input name="name" value={formData.name} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200" placeholder="Dr. John Doe" required />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Email Address</label>
+                <label className="block text-sm font-bold text-white mb-3">Email Address</label>
                 <input 
                   type="email" 
                   name="email" 
@@ -167,82 +193,83 @@ function SignUp() {
                   onChange={handleInputChange} 
                   pattern=".*@msec\.edu\.in$"
                   title="Please use your MSEC email address (@msec.edu.in)"
-                  className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500" 
+                  className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200" 
                   placeholder="john.doe@msec.edu.in" 
                   required 
                 />
-                <p className="mt-2 text-xs text-gray-600">Use your official MSEC email address</p>
+                <p className="mt-2 text-xs text-gray-100">Use your official MSEC email address</p>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Role</label>
-                <select name="role" value={formData.role} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900" required>
-                  <option value="">Select Role</option>
-                  <option value="staff">Staff</option>
-                  <option value="hod">HOD</option>
+                <label className="block text-sm font-bold text-white mb-3">Role</label>
+                <select name="role" value={formData.role} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white" required>
+                  <option value="" className="bg-gray-800">Select Role</option>
+                  <option value="staff" className="bg-gray-800">Staff</option>
+                  <option value="hod" className="bg-gray-800">HOD</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Department</label>
-                <select name="department" value={formData.department} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900" required>
-                  <option value="">Select Department</option>
-                  <option value="CSE">Computer Science & Engineering</option>
-                  <option value="AI_DS">Artificial Intelligence & Datascience</option>
-                  <option value="ECE">Electronics & Communication Engineering</option>
-                  <option value="IT">Information Technology</option>
-                  <option value="MECH">Mechanical Engineering</option>
-                  <option value="CIVIL">Civil Engineering</option>
-                  <option value="EEE">Electrical & Electronics Engineering</option>
+                <label className="block text-sm font-bold text-white mb-3">Department</label>
+                <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white" required>
+                  <option value="" className="bg-gray-800">Select Department</option>
+                  <option value="CSE" className="bg-gray-800">Computer Science & Engineering</option>
+                  <option value="AI_DS" className="bg-gray-800">Artificial Intelligence & Datascience</option>
+                  <option value="ECE" className="bg-gray-800">Electronics & Communication Engineering</option>
+                  <option value="IT" className="bg-gray-800">Information Technology</option>
+                  <option value="HNS" className="bg-gray-800">Humanities & Science (H&S)</option>
+                  <option value="MECH" className="bg-gray-800">Mechanical Engineering</option>
+                  <option value="CIVIL" className="bg-gray-800">Civil Engineering</option>
+                  <option value="EEE" className="bg-gray-800">Electrical & Electronics Engineering</option>
                 </select>
               </div>
 
               {formData.role === 'staff' && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 mb-3">Year</label>
-                    <select name="year" value={formData.year || ''} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900" required>
-                      <option value="">Select Year</option>
-                      <option value="I">I</option>
-                      <option value="II">II</option>
-                      <option value="III">III</option>
-                      <option value="IV">IV</option>
+                    <label className="block text-sm font-bold text-white mb-3">Year</label>
+                    <select name="year" value={formData.year || ''} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white" required>
+                      <option value="" className="bg-gray-800">Select Year</option>
+                      <option value="I" className="bg-gray-800">I</option>
+                      <option value="II" className="bg-gray-800">II</option>
+                      <option value="III" className="bg-gray-800">III</option>
+                      <option value="IV" className="bg-gray-800">IV</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-bold text-gray-900 mb-3">Section</label>
+                    <label className="block text-sm font-bold text-white mb-3">Section</label>
                     <select
                       name="section"
                       value={formData.section || ''}
                       onChange={handleInputChange}
-                      className={`glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 ${SINGLE_SECTION_DEPARTMENTS.includes(formData.department) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                      className={`w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white ${SINGLE_SECTION_DEPARTMENTS.includes(formData.department) ? 'opacity-50 cursor-not-allowed' : ''}`}
                       required
                       disabled={SINGLE_SECTION_DEPARTMENTS.includes(formData.department)}
                     >
-                      <option value="">Select Section</option>
-                      <option value="A">A</option>
-                      {!SINGLE_SECTION_DEPARTMENTS.includes(formData.department) && <option value="B">B</option>}
+                      <option value="" className="bg-gray-800">Select Section</option>
+                      <option value="A" className="bg-gray-800">A</option>
+                      {!SINGLE_SECTION_DEPARTMENTS.includes(formData.department) && <option value="B" className="bg-gray-800">B</option>}
                     </select>
                     {SINGLE_SECTION_DEPARTMENTS.includes(formData.department) && (
-                      <p className="mt-1 text-xs text-gray-500">{formData.department} has a single Section A by default.</p>
+                      <p className="mt-1 text-xs text-gray-100">{formData.department} has a single Section A by default.</p>
                     )}
                   </div>
                 </div>
               )}
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Phone Number</label>
-                <input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500" placeholder="+91-9876543210" />
+                <label className="block text-sm font-bold text-white mb-3">Phone Number</label>
+                <input type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200" placeholder="+91-9876543210" />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Password</label>
-                <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500" placeholder="Create a password" required />
+                <label className="block text-sm font-bold text-white mb-3">Password</label>
+                <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200" placeholder="Create a password" required />
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-gray-900 mb-3">Confirm Password</label>
-                <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} className="glass-input w-full px-4 py-4 border-0 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 text-gray-900 placeholder:text-gray-500" placeholder="Repeat password" required />
+                <label className="block text-sm font-bold text-white mb-3">Confirm Password</label>
+                <input type="password" name="confirmPassword" value={formData.confirmPassword} onChange={handleInputChange} className="w-full px-4 py-4 border-0 rounded-2xl backdrop-blur-sm bg-white/20 border border-white/30 focus:ring-2 focus:ring-blue-300 focus:outline-none transition-all duration-200 text-white placeholder:text-gray-200" placeholder="Repeat password" required />
               </div>
 
               <div className="pt-4">
@@ -253,12 +280,12 @@ function SignUp() {
             </form>
 
             <div className="mt-8 text-center">
-              <p className="text-gray-600 text-sm">Already have an account? <span className="text-blue-600 font-semibold cursor-pointer hover:underline ml-1" onClick={() => navigate('/login')}>Sign in</span></p>
+              <p className="text-gray-100 text-sm">Already have an account? <span className="text-blue-600 font-semibold cursor-pointer hover:underline ml-1" onClick={() => navigate('/login')}>Sign in</span></p>
             </div>
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

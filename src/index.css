@@ -2,6 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================
+   GLOBAL SMOOTH SCROLLING & PERFORMANCE
+   ======================================== */
+
+/* Smooth scrolling for all devices */
+html {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Reduce animations for users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Performance optimizations for all devices */
+* {
+  /* Prevent layout shifts */
+  box-sizing: border-box;
+  /* Improve text rendering */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Optimize scrolling performance */
+body {
+  margin: 0;
+  font-family: 'Inter', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Optimize animations globally */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 768px) {
+  /* Reduce complex animations on mobile */
+  .glass-card {
+    backdrop-filter: blur(8px) !important; /* Reduced from higher values */
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+
+  /* Simplify transitions on mobile */
+  * {
+    transition-duration: 0.2s !important; /* Faster transitions */
+  }
+
+  /* Optimize touch scrolling */
+  body, html {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y pinch-zoom;
+  }
+
+  /* Reduce shadow complexity */
+  .shadow-lg, .shadow-xl, .shadow-2xl {
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
+  }
+
+  /* Disable expensive effects on mobile */
+  .hover\:scale-105:hover,
+  .hover\:-translate-y-1:hover,
+  .hover\:shadow-xl:hover {
+    transform: none !important;
+    box-shadow: inherit !important;
+  }
+}
+
+/* Desktop enhancements */
+@media (min-width: 769px) {
+  /* Smooth hover effects */
+  .hover\:scale-105 {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover\:-translate-y-1 {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Enhanced glass effect on desktop */
+  .glass-card {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+/* Optimize GPU acceleration for animated elements */
+.animate-spin,
+.animate-pulse,
+[class*="animate-"] {
+  will-change: transform;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Remove will-change after animation completes */
+.animate-none {
+  will-change: auto;
+}
+
+/* Smooth scroll utility class */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Optimize card transitions */
+.glass-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: auto; /* Only add will-change when hovering */
+}
+
+.glass-card:hover {
+  will-change: transform, box-shadow;
+}
+
 /* Copied from cm/src/index.css for consistent styling and responsiveness */
 /* Ultra-smooth mobile scroll for booking form */
 @media (max-width: 640px) {

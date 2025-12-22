@@ -8,6 +8,7 @@ function Records() {
   })
   const [marksheets, setMarksheets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [departmentFilter, setDepartmentFilter] = useState('ALL')
   const [selectedExamination, setSelectedExamination] = useState('all')
   const [expandedExams, setExpandedExams] = useState(new Set())
   const [searchQuery, setSearchQuery] = useState('')
@@ -25,11 +26,32 @@ function Records() {
     setLoading(true)
     try {
       let response
+      // Respect URL query params for flexible views (e.g., HNS HOD wants year=I across departments)
+      const params = new URLSearchParams(window.location.search)
+      const yearParam = params.get('year')
+      const includeAllParam = params.get('includeAll') === 'true'
+      const departmentParam = params.get('department')
+
+      // If HNS HOD and no explicit params provided, default to Year I across all departments
+      if (userData.role === 'hod' && userData.department === 'HNS' && !yearParam && !departmentParam) {
+        // treat as year=I & includeAll=true
+        response = await fetch(`/api/marksheets?year=I&includeAll=true`)
+      } else {
+
       if (userData.role === 'staff') {
         const staffId = userData?._id || userData?.id || localStorage.getItem('userId')
         response = await fetch(`/api/marksheets?staffId=${staffId}&includeAll=true`)
       } else if (userData.role === 'hod') {
-        response = await fetch(`/api/marksheets?department=${userData.department}&includeAll=true`)
+        // If query explicitly requests a year and includeAll, use that (useful for HNS HOD)
+        if (yearParam && includeAllParam) {
+          response = await fetch(`/api/marksheets?year=${encodeURIComponent(yearParam)}&includeAll=true`)
+        } else if (departmentParam) {
+          response = await fetch(`/api/marksheets?department=${encodeURIComponent(departmentParam)}&includeAll=true`)
+        } else {
+          response = await fetch(`/api/marksheets?department=${encodeURIComponent(userData.department)}&includeAll=true`)
+        }
+      }
+      // end else block for default HNS handling
       }
       
       const data = await response.json()
@@ -101,6 +123,11 @@ function Records() {
     } else {
       filtered = groupedMarksheets[selectedExamination] || []
     }
+    // Apply HNS department filter if set (use case-insensitive, trimmed comparison)
+    if (userData?.role === 'hod' && userData?.department === 'HNS' && departmentFilter && departmentFilter !== 'ALL') {
+      const depFilterNorm = departmentFilter.toString().trim().toUpperCase()
+      filtered = filtered.filter(m => ((m.studentDetails?.department || '').toString().trim().toUpperCase()) === depFilterNorm)
+    }
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -118,7 +145,7 @@ function Records() {
       const regB = (b.studentDetails?.regNumber || '').toString().toLowerCase()
       return regA.localeCompare(regB, undefined, { numeric: true, sensitivity: 'base' })
     })
-  }, [marksheets, selectedExamination, groupedMarksheets, searchQuery])
+  }, [marksheets, selectedExamination, groupedMarksheets, searchQuery, departmentFilter, userData])
 
   const statusStyles = {
     draft: 'bg-gray-100 text-gray-800',
@@ -139,6 +166,19 @@ function Records() {
     rejected_by_hod: '⛔',
     dispatched: '📤'
   }
+
+  // Departments available in the current marksheets (for HNS filter)
+  // Normalize to trimmed uppercase to avoid duplicates like 'Mech' / ' MECH '
+  const availableDepartments = useMemo(() => {
+    const set = new Set()
+    marksheets.forEach(m => {
+      const raw = m.studentDetails?.department
+      if (!raw) return
+      const d = raw.toString().trim().toUpperCase()
+      if (d) set.add(d)
+    })
+    return Array.from(set).sort()
+  }, [marksheets])
 
   const toggleExamExpansion = (examName) => {
     const newExpanded = new Set(expandedExams)
@@ -274,6 +314,28 @@ function Records() {
                     </p>
                   )}
                 </div>
+
+                {/* Department Filter (HNS HOD only) */}
+                {userData?.role === 'hod' && userData?.department === 'HNS' && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Filter by Department</h3>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => setDepartmentFilter('ALL')}
+                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${departmentFilter === 'ALL' ? 'bg-yellow-600 text-white' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}>
+                        All Departments ({marksheets.length})
+                      </button>
+                      {availableDepartments.map(d => (
+                        <button
+                          key={d}
+                          onClick={() => setDepartmentFilter(d)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${departmentFilter === d ? 'bg-yellow-600 text-white' : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'}`}>
+                          {d} ({marksheets.filter(m => ((m.studentDetails?.department || '').toString().trim().toUpperCase()) === d).length})
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Examination Filter */}
                 <div className="mb-8">

@@ -345,7 +345,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
     // Validate file type
     if (!file.type.match(/image\/(jpeg|jpg|png)/)) {
-      showWarning('Invalid File Type', 'Please upload a JPEG or PNG image')
+      showWarning('Invalid File Format', '📸 Please upload a signature image in JPEG or PNG format. Current file type is not supported.')
       return
     }
 
@@ -438,7 +438,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       const userId = localStorage.getItem('userId')
       
       if (!userId) {
-        showError('Authentication Error', 'User ID not found. Please log in again.')
+        showError('Session Expired', '🔐 Your session has expired. Please log out and log in again to continue.')
         return
       }
 
@@ -450,7 +450,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
       const data = await response.json()
       if (!response.ok || !data.success) {
-        showError('Save Failed', 'Failed to save signature: ' + (data.error || 'Unknown error'))
+        showError('Save Failed', '❌ Unable to save signature: ' + (data.error || 'Server error. Please try again or contact support if the issue persists.'))
         return
       }
 
@@ -472,7 +472,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       showSuccess('Signature Saved', 'Your signature has been saved successfully!')
     } catch (error) {
       console.error('Error saving signature:', error)
-      showError('Error', 'Failed to save signature: ' + error.message)
+      showError('Upload Failed', '📤 Failed to save signature: ' + (error.message || 'Network error. Check your connection and try again.'))
     }
   }
 
@@ -499,7 +499,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
     try {
       const userId = localStorage.getItem('userId')
       if (!userId) {
-        setPasswordError('User ID not found. Please log in again.')
+        setPasswordError('🔐 Session expired. Please log out and log in again to reset your password.')
         return
       }
 
@@ -627,7 +627,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           // Revert optimistic change
           if (isMountedRef.current) setNotificationsEnabled(false)
           saveSettings('notificationsEnabled', false)
-          showWarning('Permission Required', 'Please allow notifications in your browser settings to receive updates.')
+          showWarning('Permission Required', '🔔 Notifications are blocked. To enable:\n1. Click the lock icon in your address bar\n2. Set Notifications to "Allow"\n3. Refresh this page')
         }
       } catch (error) {
         console.error('❌ Error enabling notifications:', error)
