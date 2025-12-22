@@ -113,8 +113,8 @@ export default async function handler(req, res) {
 
         const normalizedMarksheet = applyResultNormalization(marksheet.toObject ? marksheet.toObject() : { ...marksheet })
 
-        // Allow dispatch if approved or rescheduled by HOD
-        const allowedStatuses = ['approved_by_hod', 'rescheduled_by_hod']
+        // Allow dispatch if approved, rescheduled by HOD, or already dispatched (for re-sending)
+        const allowedStatuses = ['approved_by_hod', 'rescheduled_by_hod', 'dispatched']
         if (!allowedStatuses.includes(marksheet.status)) {
           return res.status(400).json({ 
             success: false, 
@@ -289,8 +289,8 @@ export default async function handler(req, res) {
 
             const normalizedMarksheet = applyResultNormalization(marksheet.toObject ? marksheet.toObject() : { ...marksheet })
 
-            // Allow dispatch if approved or rescheduled by HOD
-            const allowedStatuses = ['approved_by_hod', 'rescheduled_by_hod']
+            // Allow dispatch if approved, rescheduled by HOD, or already dispatched (for re-sending)
+            const allowedStatuses = ['approved_by_hod', 'rescheduled_by_hod', 'dispatched']
             if (!allowedStatuses.includes(marksheet.status)) {
               results.failed++
               results.errors.push(`Marksheet ${marksheetId} not approved by HOD`)

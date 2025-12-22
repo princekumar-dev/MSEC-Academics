@@ -264,15 +264,18 @@ export default async function handler(req, res) {
               status: { $in: ['draft'] }
             })
             if (remainingDrafts === 0) {
-              const hod = await User.findOne({ role: 'hod', department: dept })
-              if (hod?.email) {
-                await sendUserNotification(
-                  hod.email,
-                  `Year ${year} marks verified`,
-                  `All marksheets for ${dept} - Year ${year} have been verified by ${staff.name}.`,
-                  '/approval-requests'
-                )
-              }
+                // For first year, route verification notifications to HNS HOD
+                const normalizedYear = String(year || '').toUpperCase().trim()
+                const hodDeptToNotify = (normalizedYear === 'I') ? 'HNS' : dept
+                const hod = await User.findOne({ role: 'hod', department: hodDeptToNotify })
+                if (hod?.email) {
+                  await sendUserNotification(
+                    hod.email,
+                    `Year ${year} marks verified`,
+                    `All marksheets for ${dept} - Year ${year} have been verified by ${staff.name}.`,
+                    '/approval-requests'
+                  )
+                }
               if (staff.email) {
                 await sendUserNotification(
                   staff.email,
@@ -313,38 +316,58 @@ export default async function handler(req, res) {
 
       if (action === 'request-dispatch') {
         const { marksheetId, staffId } = req.body
-        
+
         const staff = await User.findById(staffId)
         if (!staff) {
           return res.status(404).json({ success: false, error: 'Staff not found' })
         }
 
+        // Load marksheet to determine student year/department so we can route to HNS for first year
+        const existing = await Marksheet.findById(marksheetId).lean()
+        if (!existing) {
+          return res.status(404).json({ success: false, error: 'Marksheet not found' })
+        }
+
+        const dept = existing.studentDetails?.department
+        const year = existing.studentDetails?.year
+        const normalizedYear = String(year || '').toUpperCase().trim()
+        const hodDeptToNotify = (normalizedYear === 'I') ? 'HNS' : dept
+
+        // Find HOD for the resolved department (HNS for first-year)
+        let hod = null
+        try {
+          hod = await User.findOne({ role: 'hod', department: hodDeptToNotify })
+        } catch (e) { hod = null }
+
+        // Prepare update payload and include hodId/hodName if we found an HOD
+        const updatePayload = {
+          status: 'dispatch_requested',
+          'dispatchRequest.requestedAt': new Date(),
+          'dispatchRequest.requestedBy': staff.name,
+          'dispatchRequest.status': 'pending',
+          'dispatchRequest.hodResponse': null,
+          'dispatchRequest.hodComments': null,
+          'dispatchRequest.scheduledDispatchDate': null,
+          'dispatchRequest.respondedAt': null,
+          'dispatchRequest.preDispatchNotificationSent': false,
+          'dispatchRequest.autoDispatched': false,
+          'dispatchRequest.autoDispatchFailed': false,
+          updatedAt: new Date()
+        }
+
+        if (hod) {
+          updatePayload.hodId = hod._id
+          updatePayload.hodName = hod.name
+        }
+
         const marksheet = await Marksheet.findByIdAndUpdate(
           marksheetId,
-          { 
-            status: 'dispatch_requested',
-            'dispatchRequest.requestedAt': new Date(),
-            'dispatchRequest.requestedBy': staff.name,
-            'dispatchRequest.status': 'pending',
-            'dispatchRequest.hodResponse': null,
-            'dispatchRequest.hodComments': null,
-            'dispatchRequest.scheduledDispatchDate': null,
-            'dispatchRequest.respondedAt': null,
-            'dispatchRequest.preDispatchNotificationSent': false,
-            'dispatchRequest.autoDispatched': false,
-            'dispatchRequest.autoDispatchFailed': false,
-            updatedAt: new Date()
-          },
+          updatePayload,
           { new: true }
         )
 
-        if (!marksheet) {
-          return res.status(404).json({ success: false, error: 'Marksheet not found' })
-        }
-        // Notify HOD about new dispatch request
+        // Notify the selected HOD about new dispatch request
         try {
-          const dept = marksheet.studentDetails?.department
-          const hod = await User.findOne({ role: 'hod', department: dept })
           if (hod?.email) {
             await sendUserNotification(
               hod.email,
@@ -352,6 +375,17 @@ export default async function handler(req, res) {
               `${staff.name} requested dispatch for ${marksheet.studentDetails?.name} (${marksheet.studentDetails?.regNumber}).`,
               '/approval-requests'
             )
+          } else {
+            // Fallback: notify department HOD if HNS not found and it's not already the department hod
+            const fallbackHod = await User.findOne({ role: 'hod', department: dept })
+            if (fallbackHod?.email) {
+              await sendUserNotification(
+                fallbackHod.email,
+                'New dispatch request',
+                `${staff.name} requested dispatch for ${marksheet.studentDetails?.name} (${marksheet.studentDetails?.regNumber}).`,
+                '/approval-requests'
+              )
+            }
           }
         } catch {}
 

@@ -32,6 +32,7 @@ const expandDepartmentName = (dept) => {
   const departmentMap = {
     'AI_DS': 'Artificial Intelligence and Data Science',
     'CSE': 'Computer Science and Engineering',
+    'HNS': 'Humanities & Science (H&S)',
     'IT': 'Information Technology',
     'ECE': 'Electronics and Communication Engineering',
     'EEE': 'Electrical and Electronics Engineering',
@@ -69,8 +70,8 @@ const generateMarksheetPDF = (marksheet, staffSignature, hodSignature, staffName
 
       // Header area with logo left and centered text block on the right
       const headerTop = doc.y
-      const logoWidth = 80
-      const logoHeight = 80
+      const logoWidth = 85
+      const logoHeight = 95
       const headerGap = 20
       const textBlockX = doc.page.margins.left + logoWidth + headerGap
       const textBlockWidth = contentWidth - logoWidth - headerGap

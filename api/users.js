@@ -78,7 +78,7 @@ export default async function handler(req, res) {
       }
 
       // Validate department
-      const validDepartments = ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT']
+      const validDepartments = ['CSE', 'AI_DS', 'ECE', 'MECH', 'CIVIL', 'EEE', 'IT', 'HNS']
       if (!validDepartments.includes(department)) {
         return res.status(400).json({ success: false, error: 'invalid department' })
       }
