@@ -1,6 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import { Suspense, lazy, useEffect } from 'react'
-import { PageSkeleton } from './components/Skeleton'
+import { LoginSkeleton, SignUpSkeleton } from './components/AuthSkeleton'
+import { 
+  DashboardSkeleton, 
+  ListSkeleton, 
+  DetailSkeleton, 
+  FormSkeleton, 
+  TableSkeleton, 
+  ContentSkeleton, 
+  SimpleSkeleton 
+} from './components/PageSkeletons'
 import ErrorBoundary from './components/ErrorBoundary'
 import Header from './components/Header'
 import BottomNav from './components/BottomNav'
@@ -24,9 +33,6 @@ const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
 const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const FAQ = lazy(() => import('./pages/FAQ'))
 const NotFound = lazy(() => import('./pages/NotFound'))
-
-// Suspense fallback
-const LoadingSpinner = () => (<PageSkeleton />)
 
 // Protected route wrapper
 const ProtectedHome = () => {
@@ -60,31 +66,29 @@ function AppContent() {
           <Header />
           <div className="flex flex-1 justify-center w-full">
             <div className={`layout-content-container flex flex-col w-full max-w-full ${!isAuthPage ? 'pb-20 md:pb-0' : ''}`}>
-              <Suspense fallback={<LoadingSpinner />}>
                     <Routes>
-                      <Route path="/" element={<ProtectedHome />} />
+                      <Route path="/" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedHome /></Suspense>} />
                       {/* Staff Routes */}
-                      <Route path="/import-marks" element={<ImportMarks />} />
-                      <Route path="/marksheets" element={<Marksheets />} />
-                      <Route path="/marksheets/:id" element={<MarksheetDetails />} />
-                      <Route path="/dispatch-requests" element={<DispatchRequests />} />
-                      <Route path="/records" element={<Records />} />
+                      <Route path="/import-marks" element={<Suspense fallback={<FormSkeleton />}><ImportMarks /></Suspense>} />
+                      <Route path="/marksheets" element={<Suspense fallback={<ListSkeleton />}><Marksheets /></Suspense>} />
+                      <Route path="/marksheets/:id" element={<Suspense fallback={<DetailSkeleton />}><MarksheetDetails /></Suspense>} />
+                      <Route path="/dispatch-requests" element={<Suspense fallback={<ListSkeleton />}><DispatchRequests /></Suspense>} />
+                      <Route path="/records" element={<Suspense fallback={<TableSkeleton />}><Records /></Suspense>} />
                       {/* HOD Routes */}
-                      <Route path="/department-overview" element={<DepartmentOverview />} />
-                      <Route path="/approval-requests" element={<ApprovalRequests />} />
-                      <Route path="/reports" element={<Reports />} />
+                      <Route path="/department-overview" element={<Suspense fallback={<DashboardSkeleton />}><DepartmentOverview /></Suspense>} />
+                      <Route path="/approval-requests" element={<Suspense fallback={<ListSkeleton />}><ApprovalRequests /></Suspense>} />
+                      <Route path="/reports" element={<Suspense fallback={<TableSkeleton />}><Reports /></Suspense>} />
                       {/* Auth Routes */}
-                      <Route path="/login" element={<Login />} />
-                      <Route path="/signup" element={<SignUp />} />
+                      <Route path="/login" element={<Suspense fallback={<LoginSkeleton />}><Login /></Suspense>} />
+                      <Route path="/signup" element={<Suspense fallback={<SignUpSkeleton />}><SignUp /></Suspense>} />
                       {/* General Routes */}
-                      <Route path="/contact" element={<Contact />} />
-                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                      <Route path="/terms-of-service" element={<TermsOfService />} />
-                      <Route path="/faq" element={<FAQ />} />
+                      <Route path="/contact" element={<Suspense fallback={<FormSkeleton />}><Contact /></Suspense>} />
+                      <Route path="/privacy-policy" element={<Suspense fallback={<ContentSkeleton />}><PrivacyPolicy /></Suspense>} />
+                      <Route path="/terms-of-service" element={<Suspense fallback={<ContentSkeleton />}><TermsOfService /></Suspense>} />
+                      <Route path="/faq" element={<Suspense fallback={<ContentSkeleton />}><FAQ /></Suspense>} />
                       {/* Fallback route for 404 */}
-                      <Route path="*" element={<NotFound />} />
+                      <Route path="*" element={<Suspense fallback={<SimpleSkeleton />}><NotFound /></Suspense>} />
                     </Routes>
-                  </Suspense>
                 </div>
               </div>
             </div>

@@ -1,52 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
-
-function LoginSkeleton() {
-  return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-8 smooth-scroll mobile-smoothest-scroll no-mobile-anim">
-      <div className="relative z-10 w-full max-w-md">
-        <div className="backdrop-blur-md bg-white/20 border border-white/30 p-8 rounded-3xl shadow-2xl animate-pulse">
-          {/* Icon skeleton */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-white/30 rounded-full mb-6"></div>
-            <div className="h-9 bg-white/30 rounded-lg w-3/4 mx-auto mb-2"></div>
-            <div className="h-6 bg-white/20 rounded-lg w-2/3 mx-auto"></div>
-          </div>
-          
-          {/* Email field skeleton */}
-          <div className="space-y-6">
-            <div>
-              <div className="h-4 bg-white/30 rounded w-24 mb-3"></div>
-              <div className="h-14 bg-white/20 rounded-2xl"></div>
-            </div>
-            
-            {/* Password field skeleton */}
-            <div>
-              <div className="h-4 bg-white/30 rounded w-20 mb-3"></div>
-              <div className="h-14 bg-white/20 rounded-2xl"></div>
-            </div>
-            
-            {/* Forgot password skeleton */}
-            <div className="text-center">
-              <div className="h-4 bg-white/20 rounded w-32 mx-auto"></div>
-            </div>
-            
-            {/* Button skeleton */}
-            <div className="pt-4">
-              <div className="h-14 bg-white/30 rounded-2xl"></div>
-            </div>
-          </div>
-          
-          {/* Sign up link skeleton */}
-          <div className="mt-8 text-center">
-            <div className="h-4 bg-white/20 rounded w-48 mx-auto"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function Login() {
   const [formData, setFormData] = useState({
@@ -54,16 +8,9 @@ function Login() {
     password: ''
   })
   const [isLoading, setIsLoading] = useState(false)
-  const [pageLoading, setPageLoading] = useState(true)
   const [error, setError] = useState('')
   const navigate = useNavigate()
   const { showSuccess, showError } = useAlert()
-  
-  useEffect(() => {
-    // Simulate page load delay for smooth skeleton transition
-    const timer = setTimeout(() => setPageLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -75,10 +22,6 @@ function Login() {
     if (error) setError('')
   }
 
-  if (pageLoading) {
-    return <LoginSkeleton />
-  }
-  
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
