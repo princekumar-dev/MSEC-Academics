@@ -44,6 +44,15 @@ function AppContent() {
   const location = useLocation()
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup'
   
+  // Remove body background when not on auth pages
+  useEffect(() => {
+    if (!isAuthPage) {
+      document.body.style.backgroundImage = 'none'
+    } else {
+      document.body.style.backgroundImage = "url('/images/campus.jpeg')"
+    }
+  }, [isAuthPage])
+  
   return (
     <>
       <div 
@@ -52,13 +61,7 @@ function AppContent() {
           fontFamily: 'Inter, Manrope, sans-serif',
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'none',
-          transform: 'translateZ(0)', // Force GPU acceleration
-          ...(isAuthPage ? {
-            backgroundImage: 'url(/images/campus.jpeg)',
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed'
-          } : {})
+          transform: 'translateZ(0)' // Force GPU acceleration
         }}
       >
         {isAuthPage && <div className="absolute inset-0 bg-black/40 z-0"></div>}

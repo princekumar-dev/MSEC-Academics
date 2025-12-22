@@ -43,6 +43,17 @@
 
   <title>MSEC Academics</title>
     <style>
+      /* Apply backdrop immediately for auth pages - before React loads */
+      body {
+        margin: 0;
+        padding: 0;
+        background-image: url('/images/campus.jpeg');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+      }
+      
       .wave-text {
         background: linear-gradient(90deg, #3d99f5, #c0c0c0, #3d99f5, #c0c0c0);
         background-size: 300% 100%;
