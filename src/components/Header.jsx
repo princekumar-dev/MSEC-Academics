@@ -292,7 +292,7 @@ function Header() {
   {/* Desktop Navigation - Close to Logo */}
   {!isAuthPage && (
           <nav className="hidden lg:flex items-center gap-4 xl:gap-5 2xl:gap-6 flex-shrink min-w-0">
-            <Link className={getLinkClassName('/')} to="/" title="Dashboard">Dashboard</Link>
+            <Link className={getLinkClassName('/home')} to="/home" title="Dashboard">Dashboard</Link>
             {isLoggedIn && userRole === 'staff' && (
               <>
                 <Link className={getLinkClassName('/marksheets')} to="/marksheets" title="Marksheets">Marksheets</Link>
@@ -494,7 +494,7 @@ function Header() {
 
             {/* Mobile Navigation Links */}
             <nav className="flex flex-col space-y-2 sm:space-y-3">
-              <Link className="text-[#111418] text-sm sm:text-base font-medium py-2.5 sm:py-3 px-3 sm:px-4 hover:text-theme-gold-500 hover:bg-theme-gold-50 rounded-lg transition-all duration-200 mobile-nav-item" to="/" onClick={() => setIsMobileMenuOpen(false)}>
+              <Link className="text-[#111418] text-sm sm:text-base font-medium py-2.5 sm:py-3 px-3 sm:px-4 hover:text-theme-gold-500 hover:bg-theme-gold-50 rounded-lg transition-all duration-200 mobile-nav-item" to="/home" onClick={() => setIsMobileMenuOpen(false)}>
                 Dashboard
               </Link>
               {isLoggedIn && userRole === 'staff' && (

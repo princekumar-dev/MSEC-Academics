@@ -80,7 +80,7 @@ function Login() {
 
         // Redirect to home page after successful login
         setTimeout(() => {
-          navigate('/')
+          navigate('/home')
           // Trigger a custom event to update header authentication state
           window.dispatchEvent(new Event('authStateChanged'))
         }, 1000)

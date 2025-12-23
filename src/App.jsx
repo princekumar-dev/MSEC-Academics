@@ -6,8 +6,14 @@ import {
   ListSkeleton, 
   DetailSkeleton, 
   FormSkeleton, 
+  RecordsSkeleton,
+  DispatchRequestsSkeleton,
+  ApprovalRequestsSkeleton,
   TableSkeleton, 
-  ContentSkeleton, 
+  FAQSkeleton,
+  PrivacySkeleton,
+  TermsSkeleton,
+  ContactSkeleton,
   SimpleSkeleton 
 } from './components/PageSkeletons'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -34,7 +40,19 @@ const TermsOfService = lazy(() => import('./pages/TermsOfService'))
 const FAQ = lazy(() => import('./pages/FAQ'))
 const NotFound = lazy(() => import('./pages/NotFound'))
 
-// Protected route wrapper
+// Root route handler - checks auth and redirects accordingly
+const RootRedirect = () => {
+  const auth = localStorage.getItem('auth')
+  
+  if (!auth) {
+    return <Navigate to="/login" replace />
+  }
+  
+  // If authenticated, redirect to home
+  return <Navigate to="/home" replace />
+}
+
+// Protected route wrapper for home/dashboard
 const ProtectedHome = () => {
   const auth = localStorage.getItem('auth')
   return auth ? <Home /> : <Navigate to="/login" replace />
@@ -56,7 +74,7 @@ function AppContent() {
   return (
     <>
       <div 
-        className="flex w-full min-h-screen flex-col overflow-x-hidden smooth-scroll" 
+        className={`flex w-full min-h-screen flex-col overflow-x-hidden smooth-scroll ${isAuthPage ? 'relative' : ''}`}
         style={{ 
           fontFamily: 'Inter, Manrope, sans-serif',
           WebkitOverflowScrolling: 'touch',
@@ -64,31 +82,34 @@ function AppContent() {
           transform: 'translateZ(0)' // Force GPU acceleration
         }}
       >
-        {isAuthPage && <div className="absolute inset-0 bg-black/40 z-0"></div>}
+        {isAuthPage && <div className="fixed inset-0 bg-black/40 z-0"></div>}
         <div className={`layout-container flex h-full grow flex-col max-w-full ${isAuthPage ? 'relative z-10' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50'}`}>
           <Header />
           <div className="flex flex-1 justify-center w-full">
             <div className={`layout-content-container flex flex-col w-full max-w-full ${!isAuthPage ? 'pb-20 md:pb-0' : ''}`}>
                     <Routes>
-                      <Route path="/" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedHome /></Suspense>} />
+                      {/* Root path - redirects based on auth status */}
+                      <Route path="/" element={<RootRedirect />} />
+                      {/* Home/Dashboard - protected route */}
+                      <Route path="/home" element={<Suspense fallback={<DashboardSkeleton />}><ProtectedHome /></Suspense>} />
                       {/* Staff Routes */}
                       <Route path="/import-marks" element={<Suspense fallback={<FormSkeleton />}><ImportMarks /></Suspense>} />
                       <Route path="/marksheets" element={<Suspense fallback={<ListSkeleton />}><Marksheets /></Suspense>} />
                       <Route path="/marksheets/:id" element={<Suspense fallback={<DetailSkeleton />}><MarksheetDetails /></Suspense>} />
-                      <Route path="/dispatch-requests" element={<Suspense fallback={<ListSkeleton />}><DispatchRequests /></Suspense>} />
-                      <Route path="/records" element={<Suspense fallback={<TableSkeleton />}><Records /></Suspense>} />
+                      <Route path="/dispatch-requests" element={<Suspense fallback={<DispatchRequestsSkeleton />}><DispatchRequests /></Suspense>} />
+                      <Route path="/records" element={<Suspense fallback={<RecordsSkeleton />}><Records /></Suspense>} />
                       {/* HOD Routes */}
                       <Route path="/department-overview" element={<Suspense fallback={<DashboardSkeleton />}><DepartmentOverview /></Suspense>} />
-                      <Route path="/approval-requests" element={<Suspense fallback={<ListSkeleton />}><ApprovalRequests /></Suspense>} />
+                      <Route path="/approval-requests" element={<Suspense fallback={<ApprovalRequestsSkeleton />}><ApprovalRequests /></Suspense>} />
                       <Route path="/reports" element={<Suspense fallback={<TableSkeleton />}><Reports /></Suspense>} />
                       {/* Auth Routes */}
                       <Route path="/login" element={<Suspense fallback={<LoginSkeleton />}><Login /></Suspense>} />
                       <Route path="/signup" element={<Suspense fallback={<SignUpSkeleton />}><SignUp /></Suspense>} />
                       {/* General Routes */}
-                      <Route path="/contact" element={<Suspense fallback={<FormSkeleton />}><Contact /></Suspense>} />
-                      <Route path="/privacy-policy" element={<Suspense fallback={<ContentSkeleton />}><PrivacyPolicy /></Suspense>} />
-                      <Route path="/terms-of-service" element={<Suspense fallback={<ContentSkeleton />}><TermsOfService /></Suspense>} />
-                      <Route path="/faq" element={<Suspense fallback={<ContentSkeleton />}><FAQ /></Suspense>} />
+                      <Route path="/contact" element={<Suspense fallback={<ContactSkeleton />}><Contact /></Suspense>} />
+                      <Route path="/privacy-policy" element={<Suspense fallback={<PrivacySkeleton />}><PrivacyPolicy /></Suspense>} />
+                      <Route path="/terms-of-service" element={<Suspense fallback={<TermsSkeleton />}><TermsOfService /></Suspense>} />
+                      <Route path="/faq" element={<Suspense fallback={<FAQSkeleton />}><FAQ /></Suspense>} />
                       {/* Fallback route for 404 */}
                       <Route path="*" element={<Suspense fallback={<SimpleSkeleton />}><NotFound /></Suspense>} />
                     </Routes>
