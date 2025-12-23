@@ -117,7 +117,7 @@ function AppContent() {
               </div>
             </div>
           </div>
-      <BottomNav />
+      {!isAuthPage && <BottomNav />}
     </>
   )
 }
