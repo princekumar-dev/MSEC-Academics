@@ -8,7 +8,7 @@
       "destination": "https://academics-su1d.onrender.com/api/$1"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets|favicon|manifest|service-worker|images|browserconfig|_redirects).*)",
       "destination": "/index.html"
     }
   ],
