@@ -449,22 +449,16 @@ function Header() {
         </div>
       )}
 
-      {/* Mobile Menu Button */}
+      {/* Mobile Profile Button */}
   {!isAuthPage && (
         <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          onClick={() => setIsSettingsOpen(true)}
           className="lg:hidden flex items-center justify-center p-1.5 sm:p-2 text-[#111418] hover:bg-gray-100 rounded-lg transition-colors duration-200 ml-2 flex-shrink-0"
-          aria-label="Toggle menu"
+          aria-label="Open settings"
         >
-          {isMobileMenuOpen ? (
-            <svg className="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          ) : (
-            <svg className="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          )}
+          <svg className="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
         </button>
       )}
 
@@ -523,9 +517,6 @@ function Header() {
                   </Link>
                 </>
               )}
-              <Link className="text-[#111418] text-sm sm:text-base font-medium py-2.5 sm:py-3 px-3 sm:px-4 hover:text-theme-gold-500 hover:bg-theme-gold-50 rounded-lg transition-all duration-200 mobile-nav-item" to="/contact" onClick={() => setIsMobileMenuOpen(false)}>
-                Contact
-              </Link>
             </nav>
 
             {/* Mobile Actions */}

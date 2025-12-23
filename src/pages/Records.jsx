@@ -1,7 +1,9 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { deriveOverallResult } from '../utils/resultUtils'
 
 function Records() {
+  const navigate = useNavigate()
   const [userData] = useState(() => {
     const auth = localStorage.getItem('auth')
     return auth ? JSON.parse(auth) : null
@@ -472,12 +474,12 @@ function Records() {
                             <p className="font-medium text-gray-900 text-sm md:text-base">{new Date(marksheet.createdAt).toLocaleDateString()}</p>
                           </div>
                           <div className="flex items-end md:justify-end">
-                            <a
-                              href={`/marksheets/${marksheet._id}`}
+                            <button
+                              onClick={() => navigate(`/marksheets/${marksheet._id}`)}
                               className="w-full md:w-auto px-4 py-2 rounded-lg font-medium text-blue-600 border border-blue-200 bg-white hover:bg-blue-50 text-center text-sm transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
                             >
                               View Details
-                            </a>
+                            </button>
                           </div>
                         </div>
                       </div>

@@ -3,7 +3,6 @@ import * as XLSX from 'xlsx'
 import { useNavigate } from 'react-router-dom'
 import { useAlert } from '../components/AlertContext'
 import ConfirmDialog from '../components/ConfirmDialog'
-import SwipeableCard from '../components/SwipeableCard'
 import { TableSkeleton } from '../components/SkeletonLoaders'
 import { NoMarksheets, NoSearchResults } from '../components/EmptyStates'
 import { useUndoToast } from '../components/UndoToast'
@@ -588,7 +587,7 @@ function Marksheets() {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
                     <select
                       value={examinationDetails.year}
-                      onChange={(e) => setExaminationDetails(prev => ({ ...prev, year: e.target.value }))}
+                      onChange={(e) => setExaminationDetails(prev => ({ ...prev, year: e.target.value, semester: '' }))}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select Year</option>
@@ -604,16 +603,33 @@ function Marksheets() {
                       value={examinationDetails.semester}
                       onChange={(e) => setExaminationDetails(prev => ({ ...prev, semester: e.target.value }))}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      disabled={!examinationDetails.year}
                     >
                       <option value="">Select Semester</option>
-                      <option value="I">I</option>
-                      <option value="II">II</option>
-                      <option value="III">III</option>
-                      <option value="IV">IV</option>
-                      <option value="V">V</option>
-                      <option value="VI">VI</option>
-                      <option value="VII">VII</option>
-                      <option value="VIII">VIII</option>
+                      {examinationDetails.year === 'I' && (
+                        <>
+                          <option value="I">I</option>
+                          <option value="II">II</option>
+                        </>
+                      )}
+                      {examinationDetails.year === 'II' && (
+                        <>
+                          <option value="III">III</option>
+                          <option value="IV">IV</option>
+                        </>
+                      )}
+                      {examinationDetails.year === 'III' && (
+                        <>
+                          <option value="V">V</option>
+                          <option value="VI">VI</option>
+                        </>
+                      )}
+                      {examinationDetails.year === 'IV' && (
+                        <>
+                          <option value="VII">VII</option>
+                          <option value="VIII">VIII</option>
+                        </>
+                      )}
                     </select>
                   </div>
                   <div>
@@ -860,29 +876,8 @@ function Marksheets() {
                     </button>
                   </div>
                 </div>
-                {groupedMarksheets[selectedExamination]?.map((marksheet) => {
-                  const swipeActions = [
-                    {
-                      label: 'View',
-                      icon: '👁️',
-                      onClick: () => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`),
-                      className: 'bg-blue-500 hover:bg-blue-600'
-                    }
-                  ]
-
-                  // Add Verify action if not verified
-                  if (marksheet.status !== 'verified_by_staff' && marksheet.status !== 'dispatch_requested') {
-                    swipeActions.push({
-                      label: 'Verify',
-                      icon: '✅',
-                      onClick: () => verifyMarksheet(marksheet._id),
-                      className: 'bg-green-500 hover:bg-green-600'
-                    })
-                  }
-
-                  return (
-                    <SwipeableCard key={marksheet._id} actions={swipeActions}>
-                      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300">
+                {groupedMarksheets[selectedExamination]?.map((marksheet) => (
+                  <div key={marksheet._id} className="bg-white p-4 sm:p-6 rounded-xl shadow-sm border border-gray-200 transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-gray-300">
                         {/* Header with name and status icon */}
                         <div className="flex items-start justify-between mb-4">
                           <h3 className="text-base sm:text-lg font-semibold text-gray-900 break-words flex-1 pr-4">
@@ -918,9 +913,7 @@ function Marksheets() {
                           </button>
                         </div>
                       </div>
-                    </SwipeableCard>
-                  )
-                })}
+                ))}
               </div>
             ) : (
               // Show grouped examinations

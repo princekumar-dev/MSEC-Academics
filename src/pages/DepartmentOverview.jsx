@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 function DepartmentOverview() {
+  const navigate = useNavigate()
   const [userData, setUserData] = useState(() => {
     const auth = localStorage.getItem('auth')
     return auth ? JSON.parse(auth) : null
@@ -430,7 +432,7 @@ function DepartmentOverview() {
                     <h2 className="responsive-heading-2 text-gray-900">Quick Actions</h2>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                    <button onClick={() => window.location.href = '/approval-requests'} className="responsive-card group bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 hover:shadow-xl transition-all duration-300 text-left">
+                    <button onClick={() => navigate('/approval-requests')} className="responsive-card group bg-gradient-to-br from-yellow-50 to-yellow-100 border-2 border-yellow-200 hover:shadow-xl transition-all duration-300 text-left">
                       <div className="flex items-start justify-between mb-3">
                         <div className="p-3 bg-yellow-100 rounded-xl group-hover:bg-yellow-200 transition-colors">
                           <svg className="w-6 h-6 md:w-7 md:h-7 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -442,7 +444,7 @@ function DepartmentOverview() {
                       <h3 className="text-base md:text-lg font-bold text-yellow-900 mb-2">Pending Approvals</h3>
                       <p className="text-sm text-yellow-700">Review dispatch requests awaiting approval</p>
                     </button>
-                    <button onClick={() => window.location.href = '/reports'} className="responsive-card group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 hover:shadow-xl transition-all duration-300 text-left">
+                    <button onClick={() => navigate('/reports')} className="responsive-card group bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 hover:shadow-xl transition-all duration-300 text-left">
                       <div className="flex items-start justify-between mb-3">
                         <div className="p-3 bg-green-100 rounded-xl group-hover:bg-green-200 transition-colors">
                           <svg className="w-6 h-6 md:w-7 md:h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -456,7 +458,7 @@ function DepartmentOverview() {
                     </button>
                     <button onClick={() => {
                       const url = (userData?.department === 'HNS') ? '/records?year=I&includeAll=true' : `/records?department=${encodeURIComponent(userData?.department || '')}`
-                      window.location.href = url
+                      navigate(url)
                     }} className="responsive-card group bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 hover:shadow-xl transition-all duration-300 text-left">
                       <div className="flex items-start justify-between mb-3">
                         <div className="p-3 bg-blue-100 rounded-xl group-hover:bg-blue-200 transition-colors">

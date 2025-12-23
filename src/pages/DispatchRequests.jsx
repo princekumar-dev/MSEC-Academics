@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import RefreshButton from '../components/RefreshButton'
+import SwipeableCard from '../components/SwipeableCard'
+import usePullToRefresh, { PullToRefreshIndicator } from '../hooks/usePullToRefresh.jsx'
 import JSZip from 'jszip'
 
 const PUBLIC_BASE_URL =
@@ -33,6 +35,18 @@ function DispatchRequests() {
   const [refreshing, setRefreshing] = useState(false)
   const [viewTab, setViewTab] = useState('active') // 'active' or 'history'
   const [currentExaminationId, setCurrentExaminationId] = useState(null) // Track current exam for filtering dispatch history
+
+  // Pull-to-refresh functionality
+  const handlePullRefresh = async () => {
+    await fetchVerifiedMarksheets()
+    setFeedback('Refreshed successfully')
+    setTimeout(() => setFeedback(''), 2000)
+  }
+
+  const { isPulling, isRefreshing, pullDistance, containerRef, threshold } = usePullToRefresh(handlePullRefresh, {
+    enabled: true,
+    threshold: 80
+  })
 
   useEffect(() => {
     if (userData?.role === 'staff') {
@@ -342,7 +356,15 @@ function DispatchRequests() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Pull to Refresh Indicator */}
+      <PullToRefreshIndicator
+        isPulling={isPulling}
+        isRefreshing={isRefreshing}
+        pullDistance={pullDistance}
+        threshold={threshold}
+      />
+      
+      <div ref={containerRef} className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-gray-900 mb-4">Dispatch Requests</h1>
@@ -411,7 +433,9 @@ function DispatchRequests() {
                           </button>
                         ))}
                           </div>
-                          <RefreshButton isLoading={refreshing} onClick={handleRefresh} />
+                          <div className="ml-auto">
+                            <RefreshButton isLoading={refreshing} onClick={handleRefresh} />
+                          </div>
                         </>
                       )}
                     </div>
@@ -590,8 +614,92 @@ function DispatchRequests() {
                 </div>
 
                 <div className="space-y-4">
-                  {filteredMarksheets.map((marksheet) => (
-                    <div key={marksheet._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden transform transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-yellow-300">
+                  {filteredMarksheets.map((marksheet) => {
+                    // Define swipe actions based on marksheet status
+                    const swipeActions = [];
+
+                    if (marksheet.status === 'verified_by_staff') {
+                      swipeActions.push({
+                        label: 'Request',
+                        icon: '📨',
+                        className: 'border-blue-300 text-blue-600 hover:border-blue-500 hover:bg-blue-50',
+                        onClick: () => handleRequest(marksheet._id)
+                      });
+                    }
+
+                    if (marksheet.status === 'rescheduled_by_hod') {
+                      swipeActions.push({
+                        label: 'Request Again',
+                        icon: '🔄',
+                        className: 'border-orange-300 text-orange-600 hover:border-orange-500 hover:bg-orange-50',
+                        onClick: () => handleRequest(marksheet._id)
+                      });
+                    }
+
+                    if (marksheet.status === 'approved_by_hod') {
+                      swipeActions.push(
+                        {
+                          label: 'Download',
+                          icon: '📥',
+                          className: 'border-amber-300 text-amber-600 hover:border-amber-500 hover:bg-amber-50',
+                          onClick: async () => {
+                            const ts = Date.now();
+                            const origin = getPublicOrigin();
+                            const url = origin ? `${origin}/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}` : `/api/generate-pdf?marksheetId=${marksheet._id}&t=${ts}`;
+                            window.open(url, '_blank');
+                            
+                            try {
+                              await fetch('/api/marksheets', {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ marksheetId: marksheet._id, status: 'dispatched' })
+                              });
+                              setMarksheets((prev) => prev.map((m) => 
+                                m._id === marksheet._id ? { ...m, status: 'dispatched' } : m
+                              ));
+                            } catch (err) {
+                              console.error('Error marking marksheet as dispatched:', err);
+                            }
+                          }
+                        },
+                        {
+                          label: 'Send',
+                          icon: '📤',
+                          className: 'border-green-300 text-green-600 hover:border-green-500 hover:bg-green-50',
+                          onClick: () => sendDispatch(marksheet)
+                        }
+                      );
+                    }
+
+                    if (marksheet.status === 'rejected_by_hod') {
+                      swipeActions.push({
+                        label: 'Review',
+                        icon: '👁️',
+                        className: 'border-red-300 text-red-600 hover:border-red-500 hover:bg-red-50',
+                        onClick: () => navigate(`/marksheets/${marksheet._id}`)
+                      });
+                    }
+
+                    if (marksheet.status === 'dispatched') {
+                      swipeActions.push(
+                        {
+                          label: 'Download',
+                          icon: '📥',
+                          className: 'border-amber-300 text-amber-600 hover:border-amber-500 hover:bg-amber-50',
+                          onClick: () => window.open(`/api/generate-pdf?marksheetId=${marksheet._id}`, '_blank')
+                        },
+                        {
+                          label: 'Re-send',
+                          icon: '🔁',
+                          className: 'border-green-300 text-green-600 hover:border-green-500 hover:bg-green-50',
+                          onClick: () => sendDispatch(marksheet)
+                        }
+                      );
+                    }
+
+                    return (
+                      <SwipeableCard key={marksheet._id} actions={swipeActions}>
+                        <div className="bg-white">
                       {/* Header Section */}
                       <div className="p-4 sm:p-6 pb-3 sm:pb-4">
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
@@ -623,8 +731,8 @@ function DispatchRequests() {
                             </div>
                           </div>
 
-                          {/* Action Button - Right side on desktop, full width on mobile */}
-                          <div className="w-full md:w-auto md:flex-shrink-0">
+                          {/* Action Button - Desktop Only (hidden on mobile) */}
+                          <div className="hidden sm:block w-full md:w-auto md:flex-shrink-0">
                             {marksheet.status === 'verified_by_staff' && (
                               <button
                                 onClick={() => handleRequest(marksheet._id)}
@@ -723,8 +831,18 @@ function DispatchRequests() {
                           </div>
                         )}
                       </div>
+
+                      {/* Mobile: Swipe instruction hint */}
+                      <div className="sm:hidden p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-100">
+                        <p className="text-xs text-center text-gray-600 flex items-center justify-center gap-2">
+                          <span>👈</span>
+                          <span className="font-medium">Swipe left for actions</span>
+                        </p>
+                      </div>
                     </div>
-                  ))}
+                  </SwipeableCard>
+                    );
+                  })}
                 </div>
                   </>
                 )}

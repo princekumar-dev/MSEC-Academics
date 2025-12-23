@@ -438,94 +438,127 @@ function ApprovalRequests() {
                 </div>
 
                 <div className="space-y-4">
-                  {filteredRequests.map((marksheet) => (
-                    <div key={marksheet._id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                      {/* Header Section */}
-                      <div className="p-4 sm:p-6 pb-3 sm:pb-4">
-                        <div className="flex items-start justify-between mb-3 gap-2">
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 truncate">{marksheet.studentDetails?.name}</h3>
-                            <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
-                              <span>{marksheet.studentDetails?.regNumber} • {formatClass(marksheet.studentDetails)}</span>
-                              {marksheet.studentDetails?.department && (
-                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${departmentColors[marksheet.studentDetails.department] || 'bg-gray-100 text-gray-800'}`}>
-                                  {departmentDisplay[marksheet.studentDetails?.department] || (marksheet.studentDetails?.department || '').toUpperCase()}
-                                </span>
-                              )}
+                  {filteredRequests.map((marksheet) => {
+                    const swipeActions = [
+                      {
+                        label: 'Details',
+                        icon: '👁️',
+                        className: 'border-slate-300 text-slate-600 hover:border-slate-500 hover:bg-slate-50',
+                        onClick: () => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`)
+                      },
+                      {
+                        label: 'Reschedule',
+                        icon: '📅',
+                        className: 'border-amber-300 text-amber-600 hover:border-amber-500 hover:bg-amber-50',
+                        onClick: (e) => handleAction(e, marksheet, 'rescheduled')
+                      },
+                      {
+                        label: 'Reject',
+                        icon: '❌',
+                        className: 'border-red-300 text-red-600 hover:border-red-500 hover:bg-red-50',
+                        onClick: (e) => handleAction(e, marksheet, 'rejected')
+                      },
+                      {
+                        label: 'Approve',
+                        icon: '✅',
+                        className: 'border-green-300 text-green-600 hover:border-green-500 hover:bg-green-50',
+                        onClick: (e) => handleAction(e, marksheet, 'approved')
+                      }
+                    ];
+
+                    return (
+                      <SwipeableCard key={marksheet._id} actions={swipeActions}>
+                        <div className="bg-white">
+                          {/* Header Section */}
+                          <div className="p-4 sm:p-6 pb-3 sm:pb-4">
+                            <div className="flex items-start justify-between mb-3 gap-2">
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 truncate">{marksheet.studentDetails?.name}</h3>
+                                <p className="text-xs sm:text-sm text-gray-600 flex items-center gap-2">
+                                  <span>{marksheet.studentDetails?.regNumber} • {formatClass(marksheet.studentDetails)}</span>
+                                  {marksheet.studentDetails?.department && (
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${departmentColors[marksheet.studentDetails.department] || 'bg-gray-100 text-gray-800'}`}>
+                                      {departmentDisplay[marksheet.studentDetails?.department] || (marksheet.studentDetails?.department || '').toUpperCase()}
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                              <span className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide flex items-center gap-1 whitespace-nowrap ${statusStyles[marksheet.status] || 'bg-yellow-100 text-yellow-800'}`}>
+                                <span className="text-xs sm:text-sm">{statusIcons[marksheet.status] || '📄'}</span>
+                                <span className="text-xs">{(marksheet.status || '').replace(/_/g, ' ')}</span>
+                              </span>
+                            </div>
+                            
+                            {/* Info Grid */}
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm">
+                              <div>
+                                <p className="text-gray-500 mb-1">Staff:</p>
+                                <p className="font-medium text-gray-900 truncate">{marksheet.staffName || 'demo staff'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 mb-1">Parent Phone:</p>
+                                <p className="font-medium text-gray-900">{marksheet.studentDetails?.parentPhoneNumber || '—'}</p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 mb-1">Exam Date:</p>
+                                <p className="font-medium text-gray-900">
+                                  {marksheet.examinationDate 
+                                    ? new Date(marksheet.examinationDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                                    : '—'
+                                  }
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-gray-500 mb-1">Subjects:</p>
+                                <p className="font-medium text-gray-900">{marksheet.subjects?.length || 0}</p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Divider */}
+                          <div className="border-t border-gray-100"></div>
+                          
+                          {/* Action Buttons Section - Desktop Only */}
+                          <div className="hidden sm:block p-4 sm:p-6 pt-3 sm:pt-4 bg-gray-50">
+                            <div className="grid grid-cols-4 gap-3">
+                              <button
+                                onClick={(e) => handleAction(e, marksheet, 'approved')}
+                                className="px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
+                              >
+                                Approve Dispatch
+                              </button>
+                              <button
+                                onClick={(e) => handleAction(e, marksheet, 'rejected')}
+                                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
+                              >
+                                Reject Request
+                              </button>
+                              <button
+                                onClick={(e) => handleAction(e, marksheet, 'rescheduled')}
+                                className="px-4 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
+                              >
+                                Reschedule
+                              </button>
+                              <button
+                                onClick={() => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`)}
+                                className="px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1"
+                              >
+                                View Details
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Mobile: Swipe instruction hint */}
+                          <div className="sm:hidden p-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-blue-100">
+                            <p className="text-xs text-center text-gray-600 flex items-center justify-center gap-2">
+                              <span>👈</span>
+                              <span className="font-medium">Swipe left for actions</span>
                             </p>
                           </div>
-                          <span className={`px-2 py-1 sm:px-3 sm:py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide flex items-center gap-1 whitespace-nowrap ${statusStyles[marksheet.status] || 'bg-yellow-100 text-yellow-800'}`}>
-                            <span className="text-xs sm:text-sm">{statusIcons[marksheet.status] || '📄'}</span>
-                            <span className="text-xs">{(marksheet.status || '').replace(/_/g, ' ')}</span>
-                          </span>
                         </div>
-                        
-                        {/* Info Grid */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6 text-xs sm:text-sm">
-                          <div>
-                            <p className="text-gray-500 mb-1">Staff:</p>
-                            <p className="font-medium text-gray-900 truncate">{marksheet.staffName || 'demo staff'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 mb-1">Parent Phone:</p>
-                            <p className="font-medium text-gray-900">{marksheet.studentDetails?.parentPhoneNumber || '—'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 mb-1">Exam Date:</p>
-                            <p className="font-medium text-gray-900">
-                              {marksheet.examinationDate 
-                                ? new Date(marksheet.examinationDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-                                : '—'
-                              }
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-gray-500 mb-1">Subjects:</p>
-                            <p className="font-medium text-gray-900">{marksheet.subjects?.length || 0}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="border-t border-gray-100"></div>
-                      
-                      {/* Action Buttons Section */}
-                      <div className="p-4 sm:p-6 pt-3 sm:pt-4 bg-gray-50">
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                          <button
-                            onClick={(e) => handleAction(e, marksheet, 'approved')}
-                            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-1"
-                          >
-                            <span className="hidden sm:inline">Approve Dispatch</span>
-                            <span className="sm:hidden">Approve</span>
-                          </button>
-                          <button
-                            onClick={(e) => handleAction(e, marksheet, 'rejected')}
-                            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1"
-                          >
-                            <span className="hidden sm:inline">Reject Request</span>
-                            <span className="sm:hidden">Reject</span>
-                          </button>
-                          <button
-                            onClick={(e) => handleAction(e, marksheet, 'rescheduled')}
-                            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white text-xs sm:text-sm font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-1"
-                          >
-                            Reschedule
-                          </button>
-                          <button
-                            onClick={() => navigate(`/marksheets/${marksheet._id || marksheet.marksheetId}`)}
-                            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-gray-50 text-gray-700 text-xs sm:text-sm font-medium rounded-lg border border-gray-300 transition-all duration-200 shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1"
-                          >
-                            <span className="hidden sm:inline">View Details</span>
-                            <span className="sm:hidden">Details</span>
-                          </button>
-                        </div>
-                      </div>
-                          {/* Divider before buttons */}
-                          <div className="my-6 border-t border-dashed border-gray-300" />
-
-                    </div>
-                  ))}
+                      </SwipeableCard>
+                    );
+                  })}
                 </div>
               </>
             )}

@@ -1,6 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 function FAQ() {
+  const navigate = useNavigate()
   const [openIndex, setOpenIndex] = useState(null)
 
   const toggleFAQ = (index) => {
@@ -251,7 +253,7 @@ function FAQ() {
               Email Support
             </a>
             <button
-              onClick={() => window.location.href = '/contact'}
+              onClick={() => navigate('/contact')}
               className="glass-button inline-flex items-center gap-2 px-6 py-3 text-blue-600 rounded-xl font-semibold transition-colors text-sm sm:text-base"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

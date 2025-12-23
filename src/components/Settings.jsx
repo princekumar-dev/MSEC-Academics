@@ -221,7 +221,10 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
   // Signature drawing functions (stable via useCallback)
   const startDrawing = useCallback((e) => {
     if (!canvasRef.current) return
-    try { e.preventDefault() } catch (err) { /* ignore */ }
+    if (e.type === 'mousedown') {
+      e.preventDefault()
+    }
+    e.stopPropagation()
     setIsDrawing(true)
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -236,7 +239,10 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
   const draw = useCallback((e) => {
     if (!isDrawing || !canvasRef.current) return
-    try { e.preventDefault() } catch (err) { /* ignore */ }
+    if (e.type === 'mousemove') {
+      e.preventDefault()
+    }
+    e.stopPropagation()
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     const rect = canvas.getBoundingClientRect()
@@ -251,7 +257,10 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
     ctx.stroke()
   }, [isDrawing, canvasRef])
 
-  const stopDrawing = useCallback(() => {
+  const stopDrawing = useCallback((e) => {
+    if (e) {
+      e.stopPropagation()
+    }
     setIsDrawing(false)
   }, [])
 
@@ -789,25 +798,32 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
         onMouseDown={(e) => e.stopPropagation()}
         className={
           mobileMode
-            ? (isFullWidthMobile ? 'mobile-fullwidth-settings' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm no-mobile-backdrop p-4')
+            ? (isFullWidthMobile ? 'fixed z-50 flex items-center justify-center px-4' : 'fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm no-mobile-backdrop p-4')
             : 'absolute top-full right-0 mt-2 w-80 sm:w-96 p-3 z-50 desktop-offset'
         }
         style={{
           WebkitTapHighlightColor: 'transparent',
-          touchAction: mobileMode ? 'manipulation' : 'auto',
-          userSelect: mobileMode ? 'none' : 'auto',
-          WebkitUserSelect: mobileMode ? 'none' : 'auto',
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
           maxWidth: '100vw',
           boxSizing: 'border-box',
-          // Add safe-area-aware top padding to avoid notch / status-bar overlap on mobile
-          paddingTop: isMobile ? 'env(safe-area-inset-top, 12px)' : undefined,
-          // set CSS var for header offset so inner panel calc() works
-          ...(isFullWidthMobile ? { ['--header-offset']: `${headerOffset + 64}px`, top: `${headerOffset + 64}px` } : {})
+          ...(isFullWidthMobile ? {
+            top: '64px',
+            left: 0,
+            right: 0,
+            bottom: '64px',
+            height: 'auto'
+          } : {})
         }}
       >
         <div 
-          className={(isFullWidthMobile ? 'inner-panel' : 'settings-glass-card no-mobile-backdrop') + ' rounded-xl shadow-lg overflow-hidden w-full max-w-sm mx-auto max-h-[90vh] flex flex-col group'} 
-          style={{ boxShadow: '0 8px 28px rgba(2,6,23,0.06)' }}
+          className={(isFullWidthMobile ? 'inner-panel' : 'settings-glass-card no-mobile-backdrop') + ' rounded-xl shadow-lg overflow-hidden w-full max-w-sm mx-auto flex flex-col group'} 
+          style={{ 
+            boxShadow: '0 8px 28px rgba(2,6,23,0.06)',
+            background: isFullWidthMobile ? '#ffffff' : undefined,
+            maxHeight: isFullWidthMobile ? '100%' : '90vh'
+          }}
           onMouseEnter={() => {
             // Add class to body for combined hover effect
             if (!isMobile && typeof document !== 'undefined') {
@@ -826,12 +842,6 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            e.preventDefault();
-            if (!isInitializing) onClose();
-          }}
-          onTouchEnd={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
             if (!isInitializing) onClose();
           }}
           className={`absolute z-10 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors touch-manipulation ${isFullWidthMobile ? 'top-3 right-3 sm:top-4 sm:right-4' : 'top-3 right-3'}`}
@@ -870,10 +880,9 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
         style={{ 
           WebkitOverflowScrolling: 'touch',
           overscrollBehavior: 'contain',
-          touchAction: mobileMode ? 'pan-y' : 'auto',
+          touchAction: 'pan-y',
           WebkitTapHighlightColor: 'transparent',
           scrollBehavior: 'smooth',
-          willChange: 'scroll-position',
           width: '100%',
           boxSizing: 'border-box'
         }}
@@ -892,16 +901,10 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                e.preventDefault();
                 setShowSignatureModal(true);
               }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setShowSignatureModal(true);
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] touch-manipulation cursor-pointer group"
-              style={{ touchAction: 'manipulation' }}
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] cursor-pointer group"
+              style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -920,18 +923,11 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                e.preventDefault();
                 setShowPasswordModal(true);
                 setPasswordError('');
               }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setShowPasswordModal(true);
-                setPasswordError('');
-              }}
-              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] touch-manipulation cursor-pointer group"
-              style={{ touchAction: 'manipulation' }}
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] cursor-pointer group"
+              style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -999,14 +995,6 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    e.preventDefault();
-                    if (!notificationLoading && notificationSupported && notificationPermission !== 'denied') {
-                      handleNotificationToggle();
-                    }
-                  }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
                     if (!notificationLoading && notificationSupported && notificationPermission !== 'denied') {
                       handleNotificationToggle();
                     }
@@ -1014,8 +1002,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   disabled={notificationLoading || !notificationSupported || notificationPermission === 'denied'}
                   className={`toggle-switch ${notificationsEnabled ? 'enabled' : 'disabled'} ${
                     notificationLoading ? 'toggle-loading' : ''
-                  } disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation`}
-                  style={{ touchAction: 'manipulation' }}
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
                   aria-label={`${notificationsEnabled ? 'Disable' : 'Enable'} push notifications`}
                 >
                   {notificationLoading ? (
@@ -1031,29 +1019,6 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                 </button>
               </div>
             </div>
-            {/* Test Notification Button */}
-            {notificationsEnabled && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleTestNotification();
-                }}
-                onTouchEnd={(e) => {
-                  e.stopPropagation();
-                  e.preventDefault();
-                  handleTestNotification();
-                }}
-                className="w-full flex items-center justify-center gap-1 p-2 rounded-md bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 text-theme-gold hover:text-yellow-600 text-xs font-semibold transition-all duration-200 min-h-[36px] touch-manipulation cursor-pointer group"
-                style={{ touchAction: 'manipulation' }}
-              >
-                <svg className="w-4 h-4 group-hover:scale-110 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Send Test Notification
-              </button>
-            )}
             
             <div className="flex items-center justify-between p-3 rounded-lg bg-white/6 min-h-[52px]">
               <div className="flex-1 pr-3 min-w-0">
@@ -1065,16 +1030,10 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    e.preventDefault();
                     handleEmailNotificationToggle();
                   }}
-                  onTouchEnd={(e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    handleEmailNotificationToggle();
-                  }}
-                  className={`toggle-switch ${emailNotifications ? 'enabled' : 'disabled'} touch-manipulation`}
-                  style={{ touchAction: 'manipulation' }}
+                  className={`toggle-switch ${emailNotifications ? 'enabled' : 'disabled'}`}
+                  style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
                   aria-label={`${emailNotifications ? 'Disable' : 'Enable'} email notifications`}
                 >
                   <div className={`toggle-knob ${emailNotifications ? 'enabled' : 'disabled'}`} />
@@ -1095,10 +1054,26 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
           <div className="space-y-2">
             <button
               type="button"
+              onClick={() => {
+                onClose();
+                navigate('/contact');
+              }}
+              className="lg:hidden w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] cursor-pointer group"
+              style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
+            >
+              <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <span className="text-sm font-medium text-[#111418] group-hover:text-[#0b1220] flex-1 transition-colors duration-200">Contact Us</span>
+              <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] group-hover:translate-x-1 flex-shrink-0 transition-all duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            <button
+              type="button"
               onClick={handleEmailSupport}
-              onTouchEnd={handleEmailSupport}
-              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] touch-manipulation cursor-pointer group"
-              style={{ touchAction: 'manipulation' }}
+              className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/6 hover:bg-white/12 hover:shadow-sm active:bg-white/5 transition-all duration-200 text-left min-h-[52px] cursor-pointer group"
+              style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
             >
               <svg className="w-4 h-4 text-[#60758a] group-hover:text-[#4a5568] flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -1110,25 +1085,58 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
             </button>
           </div>
         </div>
+
+        {/* Logout Section */}
+        <div className="border-t border-[#e7edf4] pt-3 mt-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleLogout();
+            }}
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-lg bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-semibold text-sm transition-colors min-h-[48px] cursor-pointer"
+            style={{ touchAction: 'manipulation', pointerEvents: 'auto' }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Signature Modal */}
       {showSignatureModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
-          onClick={(e) => { e.stopPropagation(); }}
-          onTouchStart={(e) => { e.stopPropagation(); }}
-          onTouchEnd={(e) => { e.stopPropagation(); }}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) {
+              e.stopPropagation();
+              setShowSignatureModal(false);
+              setSignatureMode('draw');
+              setUploadedSignature(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+          }}
+          onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl">
+          <div 
+            className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl"
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Add Your Signature</h2>
             <p className="text-sm text-gray-600 mb-5">This signature will be used in generated PDFs</p>
             
             {/* Mode Tabs */}
             <div className="flex gap-2 mb-5 bg-gray-100 p-1 rounded-lg">
               <button
-                onClick={() => setSignatureMode('draw')}
-                onTouchStart={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSignatureMode('draw');
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => { e.stopPropagation(); }}
                 className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
                   signatureMode === 'draw'
@@ -1139,8 +1147,11 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                 ✍️ Draw
               </button>
               <button
-                onClick={() => setSignatureMode('upload')}
-                onTouchStart={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSignatureMode('upload');
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => { e.stopPropagation(); }}
                 className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
                   signatureMode === 'upload'
@@ -1210,29 +1221,37 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
             
             <div className="flex gap-2">
               <button
-                onClick={clearSignature}
-                onTouchStart={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearSignature();
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200 font-semibold text-sm transition-colors"
               >
                 Clear
               </button>
               <button
-                onClick={() => {
-                  setShowSignatureModal(false)
-                  setSignatureMode('draw')
-                  setUploadedSignature(null)
-                  if (fileInputRef.current) fileInputRef.current.value = ''
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowSignatureModal(false);
+                  setSignatureMode('draw');
+                  setUploadedSignature(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
                 }}
-                onTouchStart={(e) => { e.stopPropagation(); }}
+                onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 border-2 border-gray-400 text-gray-700 rounded-lg hover:bg-gray-100 active:bg-gray-200 font-semibold text-sm transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={saveSignature}
-                onTouchStart={(e) => { e.stopPropagation(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  saveSignature();
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => { e.stopPropagation(); }}
                 className="flex-1 px-4 py-2.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 font-semibold text-sm transition-colors shadow-md hover:shadow-lg"
               >
@@ -1247,7 +1266,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
       {showPasswordModal && (
         <div 
           className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
-          onClick={(e) => {
+          onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setShowPasswordModal(false);
               setCurrentPassword('');
@@ -1259,12 +1278,15 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
         >
           <div 
             className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-2xl my-auto mx-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Reset Password</h2>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowPasswordModal(false);
                   setCurrentPassword('');
                   setNewPassword('');
@@ -1273,6 +1295,7 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors sm:hidden"
                 aria-label="Close"
+                style={{ touchAction: 'manipulation' }}
               >
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1295,6 +1318,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
+                  onFocus={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Enter current password"
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none transition-all text-sm sm:text-base"
                   autoComplete="current-password"
@@ -1309,6 +1334,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
+                  onFocus={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Enter new password (min. 6 characters)"
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none transition-all text-sm sm:text-base"
                   autoComplete="new-password"
@@ -1323,6 +1350,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
+                  onFocus={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                   placeholder="Confirm new password"
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-400 focus:border-yellow-500 focus:outline-none transition-all text-sm sm:text-base"
                   autoComplete="new-password"
@@ -1332,7 +1361,8 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
 
             <div className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-3">
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setShowPasswordModal(false);
                   setCurrentPassword('');
                   setNewPassword('');
@@ -1340,13 +1370,18 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
                   setPasswordError('');
                 }}
                 className="flex-1 px-4 py-2.5 sm:py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 active:bg-gray-100 font-semibold text-sm transition-colors touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 Cancel
               </button>
               <button
-                onClick={handlePasswordReset}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePasswordReset();
+                }}
                 disabled={passwordLoading}
                 className="flex-1 px-4 py-2.5 sm:py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 active:bg-yellow-700 font-semibold text-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors shadow-md hover:shadow-lg touch-manipulation"
+                style={{ touchAction: 'manipulation' }}
               >
                 {passwordLoading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -1355,30 +1390,6 @@ function Settings({ isOpen, onClose, userEmail, userRole, isMobile = false }) {
         </div>
       )}
 
-      {/* Logout Section */}
-      <div className="border-t border-white/10 p-3 bg-white/8">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            handleLogout();
-          }}
-          onTouchEnd={(e) => {
-            // Mobile devices sometimes only trigger touch events; handle both
-            e.stopPropagation();
-            e.preventDefault();
-            handleLogout();
-          }}
-          className="w-full flex items-center justify-center gap-1 p-3 rounded-md bg-red-50 hover:bg-red-100 active:bg-red-200 text-red-600 font-semibold text-xs transition-colors min-h-[40px] touch-manipulation cursor-pointer"
-          style={{ touchAction: 'manipulation' }}
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
-          Logout
-        </button>
-      </div>
     </div>
       </div>
     </>
